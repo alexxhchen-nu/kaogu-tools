@@ -1,0 +1,87 @@
+{
+  "pdfBaseUrl": "https://xiaohanchen.b-cdn.net/南水北调+河北_pdf/",
+  "markdownBaseUrl": "https://xiaohanchen.b-cdn.net/md_解析结果/",
+  "csvBaseUrl": "https://xiaohanchen.b-cdn.net/解析结果_csv/",
+  "books": [
+    {
+      "id": "nsbd-2",
+      "series": "nsbd",
+      "title": "南水北调2 唐县高昌墓地发掘报告",
+      "filename": "南水北调2 唐县高昌墓地发掘报告.pdf",
+      "markdownFilename": "南水北调2_解析.md",
+      "tags": ["南水北调", "唐县", "高昌", "墓地"]
+    },
+    {
+      "id": "nsbd-3",
+      "series": "nsbd",
+      "title": "南水北调3 内丘张夺考古发掘报告",
+      "filename": "南水北调3 内丘张夺考古发掘报告.pdf",
+      "markdownFilename": "南水北调3解析结果.md",
+      "tags": ["南水北调", "内丘", "张夺", "考古发掘"]
+    },
+    {
+      "id": "nsbd-5",
+      "series": "nsbd",
+      "title": "南水北调5 徐水东黑山遗址发掘报告",
+      "filename": "南水北调5 徐水东黑山遗址发掘报告.pdf",
+      "markdownFilename": "南水北调5.md",
+      "tags": ["南水北调", "徐水", "东黑山", "遗址"]
+    },
+    {
+      "id": "nsbd-6",
+      "series": "nsbd",
+      "title": "南水北调6 石家庄元氏、鹿泉墓葬发掘报告",
+      "filename": "南水北调6 石家庄元氏, 鹿泉墓葬发掘报告.pdf",
+      "markdownFilename": "南水北调6解析.md",
+      "tags": ["南水北调", "石家庄", "元氏", "鹿泉", "墓葬"]
+    },
+    {
+      "id": "nsbd-8",
+      "series": "nsbd",
+      "title": "南水北调8 磁县双营墓地",
+      "filename": "南水北调8 磁县双营墓地.pdf",
+      "markdownFilename": "南水北调8解析结果.md",
+      "tags": ["南水北调", "磁县", "双营", "墓地"]
+    },
+    {
+      "id": "nsbd-10",
+      "series": "nsbd",
+      "title": "南水北调10 邯郸薛庄遗址考古发掘报告",
+      "filename": "南水北调10 邯郸薛庄遗址考古发掘报告 .pdf",
+      "markdownFilename": "南水北调10解析结果.md",
+      "tags": ["南水北调", "邯郸", "薛庄", "遗址"]
+    },
+    {
+      "id": "nsbd-11",
+      "series": "nsbd",
+      "title": "南水北调11 磁县滏阳营",
+      "filename": "南水北调11 磁县滏阳营.pdf",
+      "markdownFilename": "南水北调11解析md.md",
+      "tags": ["南水北调", "磁县", "滏阳营"]
+    },
+    {
+      "id": "hebei-1",
+      "series": "hebei",
+      "title": "河北省考古文集（一）",
+      "filename": "河北省考古文集（一）.pdf",
+      "markdownFilename": "河北1解析.md",
+      "tags": ["河北", "考古文集"]
+    },
+    {
+      "id": "hebei-2",
+      "series": "hebei",
+      "title": "河北省考古文集（二）",
+      "filename": "河北省考古文集（二）.pdf",
+      "markdownFilename": "河北2解析.md",
+      "tags": ["河北", "考古文集"]
+    },
+    {
+      "id": "hebei-3",
+      "series": "hebei",
+      "title": "河北省考古文集（三）",
+      "filename": "河北省考古文集（三）.pdf",
+      "markdownFilename": "解析结果_河北3.md",
+      "tags": ["河北", "考古文集"]
+    }
+  ]
+}
