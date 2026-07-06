@@ -1,3 +1,27 @@
+@font-face {
+  font-family: "LXGW WenKai TC";
+  src: url("/fonts/LXGWWenKaiTC-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Long Cang";
+  src: url("/fonts/LongCang-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Iansui";
+  src: url("/fonts/Iansui-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --ink: #23201a;
   --muted: #6d675d;
@@ -13,7 +37,7 @@
   --plum: #73517a;
   --sidebar-width: 320px;
   --shadow: 0 18px 44px rgba(54, 45, 31, 0.16);
-  font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  font-family: "LXGW WenKai TC", serif;
   color: var(--ink);
   background: var(--paper);
 }
@@ -115,7 +139,7 @@ button {
 .section-heading p,
 .search-field span {
   margin: 0;
-  font-family: "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  font-family: "LXGW WenKai TC", serif;
   letter-spacing: 0;
   font-size: 12px;
 }
@@ -124,16 +148,20 @@ h1,
 h2 {
   margin: 0;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 h1 {
   max-width: 4ch;
-  font-family: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif;
+  font-family: "Long Cang", cursive;
   font-size: 68px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0;
   writing-mode: vertical-rl;
+}
+
+h2 {
+  font-family: "Iansui", cursive;
 }
 
 .search-field {

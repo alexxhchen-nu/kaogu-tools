@@ -6,4 +6,5 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "chonkie[model2vec]>=1.6.8",
+    "tailwindcss>=0.0.1",
 ]
