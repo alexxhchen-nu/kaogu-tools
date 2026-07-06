@@ -1,7 +1,33 @@
 {
-  "pdfBaseUrl": "https://xiaohanchen.b-cdn.net/南水北调+河北_pdf/",
-  "markdownBaseUrl": "https://xiaohanchen.b-cdn.net/md_解析结果/",
-  "csvBaseUrl": "https://xiaohanchen.b-cdn.net/解析结果_csv/",
+  "_meta": {
+    "description": "考古工具文献目录 — 南水北调河北段 + 河北省考古文集",
+    "version": "1.0",
+    "lastUpdated": "2026-07-04",
+    "sources": {
+      "pdf": "南水北调中线干线工程建设管理局 / 河北省文物研究所",
+      "parsing": "kaogu-tools dynamic_parser"
+    }
+  },
+
+  "baseUrls": {
+    "pdf": "https://xiaohanchen.b-cdn.net/南水北调+河北_pdf/",
+    "markdown": "https://xiaohanchen.b-cdn.net/md_解析结果/",
+    "csv": "https://xiaohanchen.b-cdn.net/解析结果_csv/"
+  },
+
+  "seriesMeta": {
+    "nsbd": {
+      "label": "南水北调",
+      "color": "#b8442f",
+      "description": "南水北调中线工程河北段考古发掘报告"
+    },
+    "hebei": {
+      "label": "河北省考古文集",
+      "color": "#2c6f7e",
+      "description": "河北省文物研究所考古文集"
+    }
+  },
+
   "books": [
     {
       "id": "nsbd-2",
@@ -9,7 +35,9 @@
       "title": "南水北调2 唐县高昌墓地发掘报告",
       "filename": "南水北调2 唐县高昌墓地发掘报告.pdf",
       "markdownFilename": "南水北调2_解析.md",
-      "tags": ["南水北调", "唐县", "高昌", "墓地"]
+      "csvFilename": "nsbd-2.csv",
+      "tags": ["南水北调", "唐县", "高昌", "墓地", "战国"],
+      "description": "唐县高昌墓地抢救性发掘，含战国至汉代墓葬群"
     },
     {
       "id": "nsbd-3",
@@ -17,7 +45,9 @@
       "title": "南水北调3 内丘张夺考古发掘报告",
       "filename": "南水北调3 内丘张夺考古发掘报告.pdf",
       "markdownFilename": "南水北调3解析结果.md",
-      "tags": ["南水北调", "内丘", "张夺", "考古发掘"]
+      "csvFilename": "nsbd-3.csv",
+      "tags": ["南水北调", "内丘", "张夺", "考古发掘", "商周"],
+      "description": "内丘县张夺遗址发掘，商周时期文化遗存为主"
     },
     {
       "id": "nsbd-5",
@@ -25,7 +55,9 @@
       "title": "南水北调5 徐水东黑山遗址发掘报告",
       "filename": "南水北调5 徐水东黑山遗址发掘报告.pdf",
       "markdownFilename": "南水北调5.md",
-      "tags": ["南水北调", "徐水", "东黑山", "遗址"]
+      "csvFilename": "nsbd-5.csv",
+      "tags": ["南水北调", "徐水", "东黑山", "遗址", "新石器"],
+      "description": "徐水东黑山新石器至商代遗址发掘报告"
     },
     {
       "id": "nsbd-6",
@@ -33,7 +65,9 @@
       "title": "南水北调6 石家庄元氏、鹿泉墓葬发掘报告",
       "filename": "南水北调6 石家庄元氏, 鹿泉墓葬发掘报告.pdf",
       "markdownFilename": "南水北调6解析.md",
-      "tags": ["南水北调", "石家庄", "元氏", "鹿泉", "墓葬"]
+      "csvFilename": "nsbd-6.csv",
+      "tags": ["南水北调", "石家庄", "元氏", "鹿泉", "墓葬", "战国"],
+      "description": "元氏、鹿泉两地战国至汉代墓群"
     },
     {
       "id": "nsbd-8",
@@ -41,7 +75,9 @@
       "title": "南水北调8 磁县双营墓地",
       "filename": "南水北调8 磁县双营墓地.pdf",
       "markdownFilename": "南水北调8解析结果.md",
-      "tags": ["南水北调", "磁县", "双营", "墓地"]
+      "csvFilename": "nsbd-8.csv",
+      "tags": ["南水北调", "磁县", "双营", "墓地", "汉代"],
+      "description": "磁县双营汉代墓地，保存较为完整"
     },
     {
       "id": "nsbd-10",
@@ -49,7 +85,9 @@
       "title": "南水北调10 邯郸薛庄遗址考古发掘报告",
       "filename": "南水北调10 邯郸薛庄遗址考古发掘报告 .pdf",
       "markdownFilename": "南水北调10解析结果.md",
-      "tags": ["南水北调", "邯郸", "薛庄", "遗址"]
+      "csvFilename": "nsbd-10.csv",
+      "tags": ["南水北调", "邯郸", "薛庄", "遗址", "商周"],
+      "description": "邯郸薛庄商周时期遗址发掘"
     },
     {
       "id": "nsbd-11",
@@ -57,7 +95,9 @@
       "title": "南水北调11 磁县滏阳营",
       "filename": "南水北调11 磁县滏阳营.pdf",
       "markdownFilename": "南水北调11解析md.md",
-      "tags": ["南水北调", "磁县", "滏阳营"]
+      "csvFilename": "nsbd-11.csv",
+      "tags": ["南水北调", "磁县", "滏阳营", "墓地", "战国"],
+      "description": "磁县滏阳营战国墓地发掘"
     },
     {
       "id": "hebei-1",
@@ -65,7 +105,9 @@
       "title": "河北省考古文集（一）",
       "filename": "河北省考古文集（一）.pdf",
       "markdownFilename": "河北1解析.md",
-      "tags": ["河北", "考古文集"]
+      "csvFilename": "hebei-1.csv",
+      "tags": ["河北", "考古文集", "综合"],
+      "description": "河北省文物研究所论文集，收录多地考古报告"
     },
     {
       "id": "hebei-2",
@@ -73,7 +115,9 @@
       "title": "河北省考古文集（二）",
       "filename": "河北省考古文集（二）.pdf",
       "markdownFilename": "河北2解析.md",
-      "tags": ["河北", "考古文集"]
+      "csvFilename": "hebei-2.csv",
+      "tags": ["河北", "考古文集", "综合"],
+      "description": "河北省文物研究所论文集（二）"
     },
     {
       "id": "hebei-3",
@@ -81,7 +125,9 @@
       "title": "河北省考古文集（三）",
       "filename": "河北省考古文集（三）.pdf",
       "markdownFilename": "解析结果_河北3.md",
-      "tags": ["河北", "考古文集"]
+      "csvFilename": "hebei-3.csv",
+      "tags": ["河北", "考古文集", "综合"],
+      "description": "河北省文物研究所论文集（三）"
     }
   ]
 }
