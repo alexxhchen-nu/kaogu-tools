@@ -22,7 +22,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 __version__ = "0.1.0"
 
 ARTIFACT_COLUMNS = ["器物编号", "器物名称", "材质", "器型", "数量", "特征描述"]
@@ -129,6 +128,129 @@ def _model_tier(tomb: dict[str, Any]) -> str:
     return "schematic"
 
 
+def _default_dimensions(tomb: dict[str, Any]) -> dict[str, float]:
+    """Fallback dimensions in meters, used only when the CSV lacks values."""
+    shape = f"{tomb.get('墓葬形制', '')}{tomb.get('备注', '')}"
+    if "石棺" in shape or "石板" in shape:
+        return {"length": 1.7, "width": 0.35, "depth": 0.4}
+    if "多室" in shape:
+        return {"length": 12.0, "width": 6.0, "depth": 3.0}
+    if "前后室" in shape:
+        return {"length": 8.5, "width": 3.8, "depth": 3.0}
+    if "木椁" in shape or "木槨" in shape:
+        return {"length": 8.0, "width": 5.0, "depth": 3.2}
+    if any(keyword in shape for keyword in ["圆", "六角", "六边", "八角", "八边"]):
+        return {"length": 3.0, "width": 3.0, "depth": 2.7}
+    if any(keyword in shape for keyword in ["竖穴", "土坑", "砖圹", "壁龛"]):
+        return {"length": 3.4, "width": 1.5, "depth": 2.0}
+    if "方形" in shape:
+        return {"length": 2.8, "width": 2.8, "depth": 2.4}
+    return {"length": 3.0, "width": 2.0, "depth": 2.0}
+
+
+def _confidence_metadata(tomb: dict[str, Any]) -> dict[str, Any]:
+    """Compute model confidence and note which dimensions were inferred."""
+    defaults = _default_dimensions(tomb)
+    dimension_sources: dict[str, str] = {}
+    dimension_notes: list[str] = []
+    recorded_count = 0
+
+    for raw_key, num_key, label in [
+        ("墓口长", "length", "墓口长"),
+        ("墓口宽", "width", "墓口宽"),
+        ("墓深", "depth", "墓深"),
+    ]:
+        if tomb.get(num_key) is not None:
+            recorded_count += 1
+            dimension_sources[label] = "recorded"
+        else:
+            tomb[num_key] = defaults[num_key]
+            if not tomb.get(raw_key):
+                tomb[raw_key] = f"{defaults[num_key]:g}"
+            dimension_sources[label] = "inferred"
+            dimension_notes.append(f"{label}按形制默认值 {defaults[num_key]:g}m 推断")
+
+    shape = f"{tomb.get('墓葬形制', '')}{tomb.get('备注', '')}"
+    structure_score = 0
+    for keyword in ["墓道", "墓门", "甬道", "前室", "中室", "后室", "耳室", "壁龛", "棺床", "仿木", "斗栱", "木椁"]:
+        if keyword in shape:
+            structure_score += 1
+
+    score = 0.28 + recorded_count * 0.16 + min(structure_score, 6) * 0.04
+    if tomb.get("器物"):
+        score += 0.04
+    score = round(min(score, 0.95), 2)
+    if score >= 0.78:
+        label = "高"
+    elif score >= 0.55:
+        label = "中"
+    else:
+        label = "低"
+
+    return {
+        "dimension_sources": dimension_sources,
+        "dimension_notes": dimension_notes,
+        "model_confidence": score,
+        "model_confidence_label": label,
+    }
+
+
+def _normalize_location(value: str) -> str:
+    text = re.sub(r"\s+", "", value or "")
+    return text[:18] if text else "未标注位置"
+
+
+def _enrich_tombs(tombs: list[dict[str, Any]]) -> None:
+    """Add confidence metadata and inferred site coordinates from 发掘位置."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for tomb in tombs:
+        tomb.update(_confidence_metadata(tomb))
+        group_key = _normalize_location(tomb.get("发掘位置", ""))
+        tomb["location_group"] = group_key
+        groups.setdefault(group_key, []).append(tomb)
+
+    ordered_groups = sorted(groups.items(), key=lambda item: (-len(item[1]), item[0]))
+    group_spacing = 18
+    local_spacing = 5
+    columns = max(1, min(5, int(len(ordered_groups) ** 0.5) + 1))
+
+    for group_index, (group_key, group_tombs) in enumerate(ordered_groups):
+        col = group_index % columns
+        row = group_index // columns
+        group_x = (col - (columns - 1) / 2) * group_spacing
+        group_z = row * group_spacing
+
+        for local_index, tomb in enumerate(group_tombs):
+            local_col = local_index % 4
+            local_row = local_index // 4
+            location_text = tomb.get("发掘位置", "")
+            trench = re.search(r"T\s*(\d+)", location_text, re.I)
+            if trench:
+                local_x = (int(trench.group(1)) % 10 - 4.5) * 1.2
+                local_z = (int(trench.group(1)) // 10) * 1.2
+                method = "发掘位置T号推断"
+            else:
+                local_x = (local_col - 1.5) * local_spacing
+                local_z = local_row * local_spacing
+                method = "同发掘位置分组网格推断"
+
+            if any(token in location_text for token in ["北", "上"]):
+                local_z -= 1.8
+            if any(token in location_text for token in ["南", "下"]):
+                local_z += 1.8
+            if "东" in location_text:
+                local_x += 1.8
+            if "西" in location_text:
+                local_x -= 1.8
+
+            tomb["site_position"] = {
+                "x": round(group_x + local_x, 2),
+                "z": round(group_z + local_z, 2),
+                "group": group_key,
+                "method": method,
+            }
+
+
 def aggregate_tombs(csv_files: list[str | Path]) -> list[dict[str, Any]]:
     """Aggregate artifact-row CSV data into tomb-level records."""
     tombs: dict[str, dict[str, Any]] = {}
@@ -156,14 +278,18 @@ def aggregate_tombs(csv_files: list[str | Path]) -> list[dict[str, Any]]:
                         "source": path.name,
                         "年代": _first_nonempty(row.get("年代"), row.get("时代")),
                         "墓向": _first_nonempty(row.get("墓向"), row.get("方向")),
-                        "墓葬形制": _first_nonempty(row.get("墓葬形制"), row.get("形制")),
+                        "墓葬形制": _first_nonempty(
+                            row.get("墓葬形制"), row.get("形制")
+                        ),
                         "墓口长": _first_nonempty(row.get("墓口长")),
                         "墓口宽": _first_nonempty(row.get("墓口宽")),
                         "墓深": _first_nonempty(row.get("墓深")),
                         "length": length,
                         "width": width,
                         "depth": depth,
-                        "发掘位置": _first_nonempty(row.get("发掘位置"), row.get("地点")),
+                        "发掘位置": _first_nonempty(
+                            row.get("发掘位置"), row.get("地点")
+                        ),
                         "层位": _first_nonempty(row.get("层位")),
                         "备注": _first_nonempty(row.get("备注"), row.get("描述")),
                         "器物": [],
@@ -172,14 +298,30 @@ def aggregate_tombs(csv_files: list[str | Path]) -> list[dict[str, Any]]:
                     artifact_seen[tomb_id] = set()
                 else:
                     tomb = tombs[tomb_id]
-                    for key in ["年代", "墓向", "墓葬形制", "墓口长", "墓口宽", "墓深", "发掘位置", "层位", "备注"]:
+                    for key in [
+                        "年代",
+                        "墓向",
+                        "墓葬形制",
+                        "墓口长",
+                        "墓口宽",
+                        "墓深",
+                        "发掘位置",
+                        "层位",
+                        "备注",
+                    ]:
                         if not tomb.get(key):
                             tomb[key] = _first_nonempty(row.get(key))
-                    for raw_key, num_key in [("墓口长", "length"), ("墓口宽", "width"), ("墓深", "depth")]:
+                    for raw_key, num_key in [
+                        ("墓口长", "length"),
+                        ("墓口宽", "width"),
+                        ("墓深", "depth"),
+                    ]:
                         if tomb.get(num_key) is None:
                             tomb[num_key] = parse_num(row.get(raw_key))
 
-                artifact = {key: _first_nonempty(row.get(key)) for key in ARTIFACT_COLUMNS}
+                artifact = {
+                    key: _first_nonempty(row.get(key)) for key in ARTIFACT_COLUMNS
+                }
                 label = _artifact_label(artifact)
                 if label and label not in artifact_seen[tomb_id]:
                     artifact_seen[tomb_id].add(label)
@@ -189,15 +331,20 @@ def aggregate_tombs(csv_files: list[str | Path]) -> list[dict[str, Any]]:
     result = list(tombs.values())
     for tomb in result:
         tomb["model_tier"] = _model_tier(tomb)
+    _enrich_tombs(result)
     result.sort(key=lambda item: (item.get("source", ""), item.get("id", "")))
     return result
 
 
 def _safe_json(data: Any) -> str:
-    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace(
+        "</", "<\\/"
+    )
 
 
-def render_tomb_model_html(tombs: list[dict[str, Any]], *, title: str = "墓葬3D建模") -> str:
+def render_tomb_model_html(
+    tombs: list[dict[str, Any]], *, title: str = "墓葬3D建模"
+) -> str:
     """Render a standalone Three.js viewer."""
     tombs_json = _safe_json(tombs)
     colors_json = _safe_json(ERA_COLORS)
@@ -300,8 +447,14 @@ h1 { margin:0; font-size:20px; line-height:1.25; font-weight:650; letter-spacing
   <main class="viewer">
     <div class="toolbar">
       <button id="fit-btn" class="tool" type="button">重置视角</button>
+      <button id="site-btn" class="tool is-active" type="button">并列场景</button>
+      <button id="single-btn" class="tool" type="button">单墓</button>
+      <button id="top-btn" class="tool" type="button">俯视</button>
       <button id="clip-btn" class="tool" type="button">截面</button>
-      <button id="label-btn" class="tool is-active" type="button">标签</button>
+      <button id="label-btn" class="tool" type="button">标签</button>
+      <button id="glb-btn" class="tool" type="button">导出GLB</button>
+      <button id="blender-btn" class="tool" type="button">Blender脚本</button>
+      <button id="dxf-btn" class="tool" type="button">DXF平面</button>
     </div>
     <div id="canvas-container"></div>
     <section id="info-panel" class="info-panel"></section>
@@ -314,6 +467,7 @@ h1 { margin:0; font-size:20px; line-height:1.25; font-weight:650; letter-spacing
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 const tombs = __TOMBS_JSON__;
 const ERA_COLORS = __COLORS_JSON__;
@@ -356,12 +510,24 @@ scene.add(ground);
 
 const tombGroup = new THREE.Group();
 scene.add(tombGroup);
-let labelsVisible = true;
+let currentBuildGroup = tombGroup;
+let labelsVisible = false;
+let viewMode = 'site';
 let activeIndex = 0;
 let visibleIndexes = tombs.map((_, i) => i);
 let activeEra = '全部';
 let clipActive = false;
 const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const selectionRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.15, 1.35, 48),
+  new THREE.MeshBasicMaterial({ color:0xf4d58b, transparent:true, opacity:0.9, side:THREE.DoubleSide })
+);
+selectionRing.rotation.x = -Math.PI / 2;
+selectionRing.position.y = 0.035;
+selectionRing.visible = false;
+scene.add(selectionRing);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -445,7 +611,7 @@ function addMesh(mesh, x=0, y=0, z=0) {
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  tombGroup.add(mesh);
+  currentBuildGroup.add(mesh);
   return mesh;
 }
 
@@ -469,7 +635,7 @@ function addLabel(text, position, color=0xffffff) {
   sprite.scale.set(4.8, 1.05, 1);
   sprite.userData.isLabel = true;
   sprite.visible = labelsVisible;
-  tombGroup.add(sprite);
+  currentBuildGroup.add(sprite);
 }
 
 function addDoorFrame(width, height, z, color=0x6b4226) {
@@ -479,6 +645,27 @@ function addDoorFrame(width, height, z, color=0x6b4226) {
   }
   for (const x of [-width * 0.28, 0, width * 0.28]) {
     addMesh(new THREE.Mesh(new THREE.BoxGeometry(width * 0.18, 0.12, 0.14), solidMat(0x8b5a2b)), x, height + 0.12, z - 0.02);
+  }
+}
+
+function addRoomBox(label, x, z, w, d, h, color, opacity=0.48) {
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), floorMat(0x403326)), x, 0.06, z);
+  const wallT = Math.max(0.08, Math.min(w, d) * 0.04);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), wallMat(color, opacity)), x, h / 2, z - d / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), wallMat(color, opacity)), x, h / 2, z + d / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), wallMat(color, opacity)), x - w / 2, h / 2, z);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), wallMat(color, opacity)), x + w / 2, h / 2, z);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w * 0.48, 0.18, d * 0.32), floorMat(0x5a4a3a)), x, 0.2, z);
+  addLabel(label, new THREE.Vector3(x, h + 0.75, z), 0xaaa28f);
+}
+
+function addVesselCluster(tomb, centerX, centerZ, color=0x8b7355) {
+  const count = Math.min(12, Math.max(3, (tomb.artifacts || tomb.器物 || []).length));
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const radius = 0.28 + (i % 3) * 0.12;
+    const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.085, 0.22, 10), solidMat(color));
+    addMesh(jar, centerX + Math.cos(angle) * radius, 0.18, centerZ + Math.sin(angle) * radius);
   }
 }
 
@@ -526,24 +713,59 @@ function buildMultiChamber(tomb) {
   const color = colorFor(tomb);
   const { length, width, depth, scale } = dimsFor(tomb);
   const L = length * scale, W = width * scale, H = depth * scale;
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.14, W), floorMat()), 0, 0.07, 0);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, 0.14), wallMat(color, 0.5)), 0, H / 2, -W / 2);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, 0.14), wallMat(color, 0.5)), 0, H / 2, W / 2);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, H, W), wallMat(color, 0.5)), -L / 2, H / 2, 0);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, H, W), wallMat(color, 0.5)), L / 2, H / 2, 0);
-  for (const x of [-L * 0.18, L * 0.18]) {
-    addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.12, H * 0.82, W * 0.86), wallMat(color, 0.62)), x, H * 0.41, 0);
-  }
-  for (const x of [-L * 0.28, L * 0.1]) {
+  const roomH = Math.max(0.9, H * 0.82);
+  const passageLen = Math.max(2.2, L * 0.26);
+  const chamberLen = Math.max(1.2, (L - passageLen * 0.45) / 3);
+  const chamberW = Math.max(1.6, W * 0.62);
+  const frontX = -chamberLen;
+  const midX = 0;
+  const rearX = chamberLen;
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L + passageLen, 0.08, W * 1.08), floorMat(0x34291f)), -passageLen * 0.18, 0.04, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passageLen, roomH * 0.58, W * 0.32), wallMat(color, 0.28)), -L / 2 - passageLen / 2, roomH * 0.29, 0);
+  addLabel('墓道', new THREE.Vector3(-L / 2 - passageLen / 2, roomH + 0.45, 0), 0xaaa28f);
+
+  addRoomBox('前室', frontX, 0, chamberLen * 0.92, chamberW, roomH, color, 0.52);
+  addRoomBox('中室', midX, 0, chamberLen * 0.86, chamberW, roomH, color, 0.52);
+  addRoomBox('后室', rearX, 0, chamberLen * 0.9, chamberW, roomH, color, 0.52);
+
+  for (const x of [frontX, midX]) {
     for (const side of [-1, 1]) {
-      addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 0.16, H * 0.62, W * 0.24), wallMat(color, 0.44)), x, H * 0.31, side * W * 0.47);
+      addRoomBox('耳室', x, side * W * 0.42, chamberLen * 0.42, W * 0.23, roomH * 0.62, color, 0.38);
     }
   }
-  const passLen = Math.max(2, L * 0.28);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, H * 0.65, W * 0.35), wallMat(color, 0.32)), -L / 2 - passLen / 2, H * 0.32, 0);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, W), roofMat(color, 0.34)), 0, H + 0.08, 0);
-  addLabel(tomb.墓葬形制 || '多室墓', new THREE.Vector3(0, H + 1.25, 0), color);
-  addLabel('墓道', new THREE.Vector3(-L / 2 - passLen / 2, H + 0.65, 0), 0xaaa28f);
+
+  if (/龛|壁龛/.test(`${tomb.墓葬形制 || ''}${tomb.备注 || ''}`)) {
+    addMesh(new THREE.Mesh(new THREE.BoxGeometry(chamberLen * 0.28, roomH * 0.52, W * 0.18), solidMat(0x3a2a1a)), rearX + chamberLen * 0.38, roomH * 0.28, 0);
+    addLabel('壁龛', new THREE.Vector3(rearX + chamberLen * 0.38, roomH * 0.9, 0), 0xaaa28f);
+  }
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, W * 0.78), roofMat(color, 0.3)), 0, roomH + 0.08, 0);
+  addVesselCluster(tomb, midX, -W * 0.16);
+  addLabel(tomb.墓葬形制 || '多室墓', new THREE.Vector3(0, roomH + 1.45, 0), color);
+}
+
+function buildFrontRearChamber(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  const roomH = Math.max(0.9, H * 0.82);
+  const frontW = Math.max(1.5, L * 0.34);
+  const rearW = Math.max(1.5, L * 0.36);
+  const roomD = Math.max(1.2, W * 0.88);
+  const gap = Math.max(0.25, L * 0.06);
+  const frontX = -(rearW + gap) / 2;
+  const rearX = (frontW + gap) / 2;
+  const passLen = Math.max(2, L * 0.35);
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(frontW + rearW + gap + passLen * 0.7, 0.08, roomD * 1.1), floorMat(0x34291f)), -passLen * 0.18, 0.04, 0);
+  addRoomBox('前室', frontX, 0, frontW, roomD * 0.94, roomH, color, 0.52);
+  addRoomBox('后室', rearX, 0, rearW, roomD, roomH, color, 0.52);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, roomH * 0.52, roomD * 0.32), wallMat(color, 0.28)), frontX - frontW / 2 - passLen / 2, roomH * 0.26, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(frontW + rearW + gap, 0.14, roomD), roofMat(color, 0.32)), gap / 2, roomH + 0.07, 0);
+  addVesselCluster(tomb, rearX, -roomD * 0.2, 0x8b7355);
+  addLabel('墓道', new THREE.Vector3(frontX - frontW / 2 - passLen / 2, roomH + 0.45, 0), 0xaaa28f);
+  addLabel(tomb.墓葬形制 || '前后室墓', new THREE.Vector3(gap / 2, roomH + 1.35, 0), color);
 }
 
 function buildShaft(tomb) {
@@ -572,31 +794,94 @@ function buildWoodChamber(tomb) {
   const color = colorFor(tomb);
   const { length, width, depth, scale } = dimsFor(tomb);
   const L = length * scale, W = width * scale, H = depth * scale;
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, W), floorMat(0x34261b)), 0, 0.06, 0);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, 0.14), wallMat(color, 0.32)), 0, H / 2, -W / 2);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, 0.14), wallMat(color, 0.32)), 0, H / 2, W / 2);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, H, W), wallMat(color, 0.32)), -L / 2, H / 2, 0);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, H, W), wallMat(color, 0.32)), L / 2, H / 2, 0);
-  const cL = L * 0.72, cW = W * 0.72, cH = H * 0.55;
+  const pitH = Math.max(1.2, H * 0.92);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, W), floorMat(0x2d2118)), 0, 0.06, 0);
+  for (const z of [-W / 2, W / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, pitH, 0.14), wallMat(color, 0.28)), 0, pitH / 2, z);
+  for (const x of [-L / 2, L / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, pitH, W), wallMat(color, 0.28)), x, pitH / 2, 0);
+
+  const cL = L * 0.68, cW = W * 0.62, cH = pitH * 0.52;
   for (const z of [-cW / 2, cW / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(cL, cH, 0.1), solidMat(0x8b6914)), 0, cH / 2, z);
   for (const x of [-cL / 2, cL / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.1, cH, cW), solidMat(0x8b6914)), x, cH / 2, 0);
-  for (let i = 0; i < 7; i++) addMesh(new THREE.Mesh(new THREE.BoxGeometry(cL + 0.08, 0.045, cW + 0.08), solidMat(0x8b6914)), 0, cH + i * 0.07, 0);
-  const passLen = Math.max(2.5, L * 0.8);
-  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, H * 0.5, W * 0.38), wallMat(color, 0.25)), -L / 2 - passLen / 2, H * 0.25, 0);
-  addLabel(tomb.墓葬形制 || '木椁墓', new THREE.Vector3(0, H + 1.0, 0), color);
+  for (let i = 0; i < 7; i++) {
+    addMesh(new THREE.Mesh(new THREE.BoxGeometry(cL + 0.08 + i * 0.03, 0.045, cW + 0.08 + i * 0.03), solidMat(0x8b6914)), 0, cH + i * 0.07, 0);
+  }
+
+  const passLen = Math.max(3, L * 0.95);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, pitH * 0.48, W * 0.34), wallMat(color, 0.22)), -L / 2 - passLen / 2, pitH * 0.24, 0);
+  addLabel('墓道', new THREE.Vector3(-L / 2 - passLen / 2, pitH + 0.45, 0), 0xaaa28f);
+
+  if (/侧室|小侧室/.test(`${tomb.墓葬形制 || ''}${tomb.备注 || ''}`)) {
+    const sideX = L / 2 + Math.max(0.8, L * 0.13);
+    addRoomBox('侧室', sideX, 0, Math.max(1.2, L * 0.22), Math.max(1.1, W * 0.36), pitH * 0.52, color, 0.36);
+    addVesselCluster(tomb, sideX, 0, 0x8b7355);
+  } else {
+    addVesselCluster(tomb, 0, -cW * 0.25, 0x8b7355);
+  }
+  addLabel('主椁室', new THREE.Vector3(0, cH + 0.75, 0), 0xaaa28f);
+  addLabel(tomb.墓葬形制 || '木椁墓', new THREE.Vector3(0, pitH + 1.15, 0), color);
 }
 
 function buildTomb(tomb) {
   const shape = `${tomb.墓葬形制 || tomb.name || ''}${tomb.备注 || ''}`;
   if (/石棺|石板/.test(shape)) buildStoneCoffin(tomb);
   else if (/木椁|木槨/.test(shape)) buildWoodChamber(tomb);
-  else if (/多室|前后室|前室|后室|耳室/.test(shape)) buildMultiChamber(tomb);
+  else if (/前后室/.test(shape)) buildFrontRearChamber(tomb);
+  else if (/多室|前室|中室|后室|耳室/.test(shape)) buildMultiChamber(tomb);
   else if (/竖穴|土坑|砖圹|壁龛/.test(shape)) buildShaft(tomb);
   else if (/六角|六边/.test(shape)) buildCircular(tomb, 6);
   else if (/八角|八边/.test(shape)) buildCircular(tomb, 8);
   else if (/圆/.test(shape)) buildCircular(tomb, 32);
   else if (/攒尖|方形/.test(shape)) buildPyramidRoof(tomb);
   else buildRectangular(tomb);
+}
+
+function buildTombAt(tomb, index, options={}) {
+  const root = new THREE.Group();
+  root.userData.tombIndex = index;
+  root.userData.tombId = tomb.id;
+  currentBuildGroup = root;
+  buildTomb(tomb);
+  currentBuildGroup = tombGroup;
+
+  const pos = tomb.site_position || { x:0, z:0 };
+  root.position.set(options.single ? 0 : pos.x || 0, 0, options.single ? 0 : pos.z || 0);
+  if (!options.single) root.scale.setScalar(0.62);
+  root.traverse((obj) => {
+    obj.userData.tombIndex = index;
+    if (obj.userData.isLabel) obj.visible = labelsVisible;
+  });
+  tombGroup.add(root);
+  return root;
+}
+
+function selectedPosition() {
+  const tomb = tombs[activeIndex];
+  if (!tomb || viewMode === 'single') return new THREE.Vector3(0, 0.04, 0);
+  const pos = tomb.site_position || { x:0, z:0 };
+  return new THREE.Vector3(pos.x || 0, 0.04, pos.z || 0);
+}
+
+function updateSelectionRing() {
+  if (viewMode === 'single' || !tombs[activeIndex]) {
+    selectionRing.visible = false;
+    return;
+  }
+  selectionRing.visible = true;
+  selectionRing.position.copy(selectedPosition());
+  const { length, width, scale } = dimsFor(tombs[activeIndex]);
+  const radius = Math.max(1.2, Math.max(length, width) * scale * 0.42);
+  selectionRing.scale.setScalar(radius);
+}
+
+function renderScene() {
+  clearTomb();
+  if (viewMode === 'single') {
+    buildTombAt(tombs[activeIndex], activeIndex, { single:true });
+  } else {
+    visibleIndexes.forEach((index) => buildTombAt(tombs[index], index));
+  }
+  applyClipping();
+  updateSelectionRing();
 }
 
 function applyClipping() {
@@ -611,21 +896,45 @@ function applyClipping() {
 function showTomb(index) {
   activeIndex = index;
   const tomb = tombs[index];
-  clearTomb();
-  buildTomb(tomb);
-  tombGroup.traverse((obj) => { if (obj.userData.isLabel) obj.visible = labelsVisible; });
-  applyClipping();
+  renderScene();
   renderList();
   renderInfo(tomb);
-  fitCamera(tomb);
+  fitCamera();
 }
 
-function fitCamera(tomb) {
+function fitSingleCamera(tomb) {
   const { length, width, depth, scale } = dimsFor(tomb);
   const maxDim = Math.max(length * scale, width * scale, depth * scale, 3);
   camera.position.set(maxDim * 1.45, maxDim * 0.85, maxDim * 1.45);
   controls.target.set(0, Math.max(0.7, depth * scale * 0.35), 0);
   controls.update();
+}
+
+function fitSceneCamera(topDown=false) {
+  const box = new THREE.Box3().setFromObject(tombGroup);
+  if (box.isEmpty()) {
+    camera.position.set(16, 12, 16);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    return;
+  }
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxDim = Math.max(size.x, size.z, 8);
+  if (topDown) {
+    camera.position.set(center.x, Math.max(18, maxDim * 1.35), center.z + 0.01);
+  } else {
+    camera.position.set(center.x + maxDim * 0.78, Math.max(12, maxDim * 0.58), center.z + maxDim * 0.86);
+  }
+  controls.target.set(center.x, Math.max(0.8, center.y * 0.45), center.z);
+  controls.update();
+}
+
+function fitCamera() {
+  if (viewMode === 'single') fitSingleCamera(tombs[activeIndex]);
+  else fitSceneCamera(viewMode === 'top');
 }
 
 function renderInfo(tomb) {
@@ -635,6 +944,12 @@ function renderInfo(tomb) {
     ['墓口宽', tomb.墓口宽 || tomb.width],
     ['墓深', tomb.墓深 || tomb.depth],
   ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+  const dimensionSources = tomb.dimension_sources || {};
+  const dimensionNotes = tomb.dimension_notes || [];
+  const sourceHtml = Object.entries(dimensionSources).map(([label, source]) => {
+    const text = source === 'recorded' ? '原始记录' : '推断';
+    return `<span>${escapeHtml(label)}：${text}</span>`;
+  }).join(' · ');
   panel.innerHTML = `
     <div>
       <h2>${escapeHtml(tomb.id)} <span class="muted">${escapeHtml(tomb.年代 || '')}</span></h2>
@@ -643,10 +958,14 @@ function renderInfo(tomb) {
       <div class="dim-grid">
         ${dims.map(([label, value]) => `<div class="dim"><strong>${escapeHtml(value)}m</strong><span>${label}</span></div>`).join('')}
         <div class="dim"><strong>${escapeHtml(tomb.model_tier || 'schematic')}</strong><span>建模层级</span></div>
+        <div class="dim"><strong>${escapeHtml(tomb.model_confidence_label || '低')}</strong><span>置信度 ${escapeHtml(tomb.model_confidence ?? '')}</span></div>
       </div>
     </div>
     <div>
       <p class="desc">${escapeHtml(tomb.备注 || '暂无结构描述；模型按形制关键词和默认尺寸示意生成。')}</p>
+      ${sourceHtml ? `<div class="artifact-line">尺寸来源：${sourceHtml}</div>` : ''}
+      ${dimensionNotes.length ? `<div class="artifact-line">推断说明：${escapeHtml(dimensionNotes.join('；'))}</div>` : ''}
+      ${tomb.site_position ? `<div class="artifact-line">并列位置：${escapeHtml(tomb.site_position.group)}；${escapeHtml(tomb.site_position.method)}</div>` : ''}
       ${tomb.器物?.length ? `<div class="artifact-line">出土器物：${escapeHtml(tomb.器物.slice(0, 28).join('、'))}${tomb.器物.length > 28 ? ' 等' : ''}</div>` : ''}
     </div>
   `;
@@ -703,7 +1022,12 @@ function renderEraFilters() {
       activeEra = button.dataset.era;
       renderEraFilters();
       renderList();
-      if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) showTomb(visibleIndexes[0]);
+      if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) {
+        showTomb(visibleIndexes[0]);
+      } else {
+        renderScene();
+        fitCamera();
+      }
     });
   });
 }
@@ -717,9 +1041,38 @@ function resize() {
 
 document.getElementById('search').addEventListener('input', () => {
   renderList();
-  if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) showTomb(visibleIndexes[0]);
+  if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) {
+    showTomb(visibleIndexes[0]);
+  } else {
+    renderScene();
+    fitCamera();
+  }
 });
-document.getElementById('fit-btn').addEventListener('click', () => showTomb(activeIndex));
+document.getElementById('fit-btn').addEventListener('click', () => fitCamera());
+document.getElementById('site-btn').addEventListener('click', () => {
+  viewMode = 'site';
+  document.getElementById('site-btn').classList.add('is-active');
+  document.getElementById('single-btn').classList.remove('is-active');
+  document.getElementById('top-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
+document.getElementById('single-btn').addEventListener('click', () => {
+  viewMode = 'single';
+  document.getElementById('single-btn').classList.add('is-active');
+  document.getElementById('site-btn').classList.remove('is-active');
+  document.getElementById('top-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
+document.getElementById('top-btn').addEventListener('click', () => {
+  viewMode = 'top';
+  document.getElementById('top-btn').classList.add('is-active');
+  document.getElementById('site-btn').classList.remove('is-active');
+  document.getElementById('single-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
 document.getElementById('clip-btn').addEventListener('click', (event) => {
   clipActive = !clipActive;
   event.currentTarget.classList.toggle('is-active', clipActive);
@@ -729,6 +1082,146 @@ document.getElementById('label-btn').addEventListener('click', (event) => {
   labelsVisible = !labelsVisible;
   event.currentTarget.classList.toggle('is-active', labelsVisible);
   tombGroup.traverse((obj) => { if (obj.userData.isLabel) obj.visible = labelsVisible; });
+});
+
+container.addEventListener('pointerdown', (event) => {
+  if (viewMode === 'single') return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(tombGroup.children, true);
+  const hit = hits.find((item) => Number.isInteger(item.object.userData.tombIndex));
+  if (hit) {
+    activeIndex = hit.object.userData.tombIndex;
+    renderList();
+    renderInfo(tombs[activeIndex]);
+    updateSelectionRing();
+  }
+});
+
+function safeFilename(value, suffix) {
+  const stem = String(value || 'tomb-model').replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 80) || 'tomb-model';
+  return `${stem}.${suffix}`;
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadText(filename, text, type='text/plain;charset=utf-8') {
+  downloadBlob(filename, new Blob([text], { type }));
+}
+
+function exportGLB() {
+  const exporter = new GLTFExporter();
+  const exportRoot = tombGroup.clone(true);
+  exportRoot.traverse((obj) => {
+    if (obj.userData?.isLabel) obj.visible = false;
+  });
+  exporter.parse(
+    exportRoot,
+    (result) => {
+      if (result instanceof ArrayBuffer) {
+        downloadBlob(safeFilename('__TITLE__', 'glb'), new Blob([result], { type:'model/gltf-binary' }));
+      } else {
+        downloadText(safeFilename('__TITLE__', 'gltf'), JSON.stringify(result, null, 2), 'model/gltf+json;charset=utf-8');
+      }
+    },
+    (error) => {
+      console.error(error);
+      alert('GLB导出失败，请查看浏览器控制台。');
+    },
+    { binary:true, onlyVisible:true }
+  );
+}
+
+function blenderScript() {
+  const exportTombs = (viewMode === 'single' ? [activeIndex] : visibleIndexes).map((index) => tombs[index]);
+  const data = JSON.stringify(exportTombs, null, 2);
+  return `import bpy
+import math
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+
+tombs = ${data}
+
+def mat(name, color):
+    material = bpy.data.materials.new(name)
+    material.diffuse_color = color
+    return material
+
+wall = mat('semi_transparent_wall', (0.55, 0.43, 0.30, 0.45))
+floor = mat('floor_and_coffin_bed', (0.30, 0.23, 0.16, 1.0))
+wood = mat('wood_chamber', (0.48, 0.32, 0.12, 1.0))
+
+def cube(name, loc, scale, material):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = scale
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.data.materials.append(material)
+    return obj
+
+def build_tomb(t):
+    pos = t.get('site_position') or {'x': 0, 'z': 0}
+    length = float(t.get('length') or 3)
+    width = float(t.get('width') or 2)
+    depth = float(t.get('depth') or 2)
+    scale = 0.35 if max(length, width, depth) > 12 else 1.0
+    x = float(pos.get('x') or 0)
+    z = float(pos.get('z') or 0)
+    L, W, H = length * scale, width * scale, depth * scale
+    cube(t.get('id', 'tomb') + '_floor', (x, 0.03, z), (L, 0.06, W), floor)
+    cube(t.get('id', 'tomb') + '_body', (x, H / 2, z), (L, H, W), wall)
+    if '木椁' in (t.get('墓葬形制') or ''):
+        cube(t.get('id', 'tomb') + '_wood_chamber', (x, H * 0.3, z), (L * 0.65, H * 0.5, W * 0.65), wood)
+
+for tomb in tombs:
+    build_tomb(tomb)
+
+bpy.ops.wm.save_as_mainfile(filepath='kaogu_tomb_model.blend')
+`;
+}
+
+function dxfText() {
+  const exportIndexes = viewMode === 'single' ? [activeIndex] : visibleIndexes;
+  const lines = ['0', 'SECTION', '2', 'ENTITIES'];
+  function addLine(x1, z1, x2, z2, layer='TOMBS') {
+    lines.push('0', 'LINE', '8', layer, '10', String(x1), '20', String(z1), '30', '0', '11', String(x2), '21', String(z2), '31', '0');
+  }
+  function addRect(cx, cz, w, d, layer) {
+    const x1 = cx - w / 2, x2 = cx + w / 2, z1 = cz - d / 2, z2 = cz + d / 2;
+    addLine(x1, z1, x2, z1, layer);
+    addLine(x2, z1, x2, z2, layer);
+    addLine(x2, z2, x1, z2, layer);
+    addLine(x1, z2, x1, z1, layer);
+  }
+  exportIndexes.forEach((index) => {
+    const tomb = tombs[index];
+    const pos = viewMode === 'single' ? { x:0, z:0 } : (tomb.site_position || { x:0, z:0 });
+    const { length, width, scale } = dimsFor(tomb);
+    addRect(pos.x || 0, pos.z || 0, length * scale * (viewMode === 'single' ? 1 : 0.62), width * scale * (viewMode === 'single' ? 1 : 0.62), 'TOMB_OUTLINES');
+  });
+  lines.push('0', 'ENDSEC', '0', 'EOF');
+  return lines.join('\n');
+}
+
+document.getElementById('glb-btn').addEventListener('click', exportGLB);
+document.getElementById('blender-btn').addEventListener('click', () => {
+  downloadText(safeFilename('__TITLE__', 'py'), blenderScript(), 'text/x-python;charset=utf-8');
+});
+document.getElementById('dxf-btn').addEventListener('click', () => {
+  downloadText(safeFilename('__TITLE__', 'dxf'), dxfText(), 'application/dxf;charset=utf-8');
 });
 
 function animate() {
@@ -807,7 +1300,9 @@ def main() -> None:
     parser.add_argument("inputs", nargs="+", help="CSV文件路径,或包含CSV的目录")
     parser.add_argument("--outdir", default="output", help="输出目录 (默认: output)")
     parser.add_argument("--title", default="墓葬3D建模", help="HTML标题")
-    parser.add_argument("--discover", action="store_true", help="仅扫描CSV并输出统计,不生成HTML")
+    parser.add_argument(
+        "--discover", action="store_true", help="仅扫描CSV并输出统计,不生成HTML"
+    )
     args = parser.parse_args()
 
     csv_files = collect_csv_files(args.inputs)

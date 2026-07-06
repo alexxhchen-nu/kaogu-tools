@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>河北墓葬3D建模 - 考古可视化</title>
+<style>
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; overflow:hidden; }
+body {
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:#e8e4da; background:#141417;
+}
+button, input { font:inherit; }
+.shell { display:grid; grid-template-columns:340px minmax(0,1fr); height:100vh; }
+.sidebar {
+  min-width:0; background:#1f211e; border-right:1px solid rgba(255,255,255,.12);
+  display:flex; flex-direction:column;
+}
+.sidebar header { padding:16px 18px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
+.eyebrow { margin:0 0 4px; color:#aaa28f; font-size:12px; }
+h1 { margin:0; font-size:20px; line-height:1.25; font-weight:650; letter-spacing:0; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,.1); }
+.stat { background:#292a26; border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:8px; }
+.stat strong { display:block; font-size:18px; color:#fff; }
+.stat span { color:#aaa28f; font-size:11px; }
+.controls { padding:12px 18px; display:grid; gap:10px; border-bottom:1px solid rgba(255,255,255,.1); }
+.search { width:100%; border:1px solid rgba(255,255,255,.16); border-radius:6px; background:#151612; color:#fff; padding:9px 10px; outline:none; }
+.filter-row { display:flex; gap:8px; flex-wrap:wrap; }
+.chip {
+  border:1px solid rgba(255,255,255,.14); color:#ddd4c2; background:#282923;
+  border-radius:6px; padding:6px 9px; cursor:pointer;
+}
+.chip.is-active { background:#d6a84f; border-color:#d6a84f; color:#17130b; }
+.tomb-list { flex:1; overflow:auto; padding:10px; }
+.tomb-item {
+  width:100%; text-align:left; color:inherit; cursor:pointer; border:1px solid transparent;
+  background:transparent; border-radius:6px; padding:10px; display:grid; gap:5px;
+}
+.tomb-item:hover { background:rgba(255,255,255,.06); }
+.tomb-item.is-active { background:rgba(214,168,79,.13); border-color:rgba(214,168,79,.45); }
+.tomb-title { color:#fff; font-weight:650; line-height:1.35; }
+.tomb-meta { color:#aaa28f; font-size:12px; line-height:1.45; }
+.badge { display:inline-block; width:max-content; border-radius:4px; padding:2px 6px; color:#fff; font-size:11px; }
+.viewer { position:relative; min-width:0; height:100vh; background:#121316; }
+#canvas-container { position:absolute; inset:0 0 190px 0; }
+.toolbar {
+  position:absolute; top:12px; left:12px; right:12px; display:flex; gap:8px; z-index:4; flex-wrap:wrap;
+}
+.tool {
+  border:1px solid rgba(255,255,255,.16); background:rgba(31,33,30,.86); color:#eee;
+  border-radius:6px; padding:8px 10px; cursor:pointer; backdrop-filter:blur(8px);
+}
+.tool.is-active { background:#d6a84f; color:#17130b; border-color:#d6a84f; }
+.info-panel {
+  position:absolute; left:0; right:0; bottom:0; min-height:190px; max-height:190px; overflow:auto;
+  background:#1b1c19; border-top:1px solid rgba(255,255,255,.12); padding:16px 20px;
+  display:grid; grid-template-columns:minmax(240px,380px) minmax(0,1fr); gap:20px;
+}
+.info-panel h2 { margin:0 0 6px; font-size:18px; line-height:1.3; letter-spacing:0; }
+.muted { color:#aaa28f; }
+.dim-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.dim { min-width:74px; background:#272822; border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:8px; }
+.dim strong { display:block; font-size:17px; color:#f4d58b; }
+.dim span { color:#aaa28f; font-size:11px; }
+.desc { margin:0; color:#d9d0bf; line-height:1.6; font-size:13px; }
+.artifact-line { margin-top:8px; color:#aaa28f; font-size:12px; line-height:1.5; }
+.empty { padding:24px; color:#aaa28f; }
+@media (max-width: 780px) {
+  .shell { grid-template-columns:1fr; grid-template-rows:280px minmax(0,1fr); }
+  .sidebar { border-right:0; border-bottom:1px solid rgba(255,255,255,.12); }
+  .info-panel { grid-template-columns:1fr; max-height:220px; }
+  #canvas-container { bottom:220px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <header>
+      <p class="eyebrow">考古工具 / 3D 建模</p>
+      <h1>河北墓葬3D建模</h1>
+    </header>
+    <div class="stats">
+      <div class="stat"><strong id="stat-total">0</strong><span>墓葬</span></div>
+      <div class="stat"><strong id="stat-shapes">0</strong><span>形制</span></div>
+      <div class="stat"><strong id="stat-visible">0</strong><span>筛选</span></div>
+    </div>
+    <div class="controls">
+      <input id="search" class="search" type="search" placeholder="检索编号、形制、地点、器物">
+      <div class="filter-row" id="era-filters"></div>
+    </div>
+    <div id="tomb-list" class="tomb-list"></div>
+  </aside>
+  <main class="viewer">
+    <div class="toolbar">
+      <button id="fit-btn" class="tool" type="button">重置视角</button>
+      <button id="site-btn" class="tool is-active" type="button">并列场景</button>
+      <button id="single-btn" class="tool" type="button">单墓</button>
+      <button id="top-btn" class="tool" type="button">俯视</button>
+      <button id="clip-btn" class="tool" type="button">截面</button>
+      <button id="label-btn" class="tool" type="button">标签</button>
+      <button id="glb-btn" class="tool" type="button">导出GLB</button>
+      <button id="blender-btn" class="tool" type="button">Blender脚本</button>
+      <button id="dxf-btn" class="tool" type="button">DXF平面</button>
+    </div>
+    <div id="canvas-container"></div>
+    <section id="info-panel" class="info-panel"></section>
+  </main>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.164.1/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+const tombs = [{"id":"东沟道下石棺墓群","name":"石棺墓（石板砌成）","source":"hebei-1.csv","年代":"春秋-战国","墓向":"南北向为主","墓葬形制":"石棺墓（石板砌成）","墓口长":"1.7","墓口宽":"0.35","墓深":"0.4","length":1.7,"width":0.35,"depth":0.4,"发掘位置":"土城镇东沟道下","层位":"","备注":"石棺结构同牛圈子梁。清理1座：棺内长1.65、宽0.25-0.27、深0.3-0.35米。骨架零乱，头骨移位，疑为迁葬或二次葬。随葬坩锅等。","器物":["坩锅（陶器）"],"artifacts":[{"器物编号":"东沟道下-1","器物名称":"坩锅","材质":"陶器","器型":"坩锅","数量":"1","特征描述":"质地松散，火候低，器表素面、压磨，带錾耳"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 1.7m 推断","墓口宽按形制默认值 0.35m 推断","墓深按形制默认值 0.4m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"土城镇东沟道下","site_position":{"x":12.3,"z":109.8,"group":"土城镇东沟道下","method":"同发掘位置分组网格推断"}},{"id":"中角M4","name":"砖砌多室墓（7室1龛）","source":"hebei-1.csv","年代":"汉代","墓向":"西偏北5°","墓葬形制":"砖砌多室墓（7室1龛）","墓口长":"29.3","墓口宽":"11.0","墓深":"5.0","length":29.3,"width":11.0,"depth":5.0,"发掘位置":"武邑县刘疃乡中角村北","层位":"","备注":"东西通长29.3、最宽处11、高5米。有墓道、墓门、甬道、前室、中室和后室，前室和中室两侧各有一耳室，后室东壁有一壁龛。早年被盗。出土完整和可复原器物百余件。","器物":["陶楼（陶器）","A型陶壶（陶器）","B型陶壶（陶器）","A型陶釜（陶器）","B型陶釜（陶器）","A型陶罐（陶器）","B型陶罐（陶器）×12","陶盆（陶器）","陶鼎（陶器）","A型陶奁（陶器）","B型陶奁（陶器）","A型陶案（陶器）","B型陶案（陶器）×2","陶盘（陶器）×16","陶碗（陶器）×4","陶耳杯（陶器）×8","陶灯（陶器）","陶井（陶器）","陶磨（陶器）","陶灶（陶器）"],"artifacts":[{"器物编号":"M4:3","器物名称":"陶楼","材质":"陶器","器型":"楼","数量":"1","特征描述":"泥质红陶，三层组合阁式建筑，通体饰绿釉。通面宽52、侧宽29.5、通高96厘米"},{"器物编号":"M4:2","器物名称":"A型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"泥质灰陶，方唇，直口，长颈，扁圆腹，高圈足。口径18、底径24.8、通高50.6厘米"},{"器物编号":"M4:82","器物名称":"B型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"泥质灰陶，圆方唇，直口，折肩。口径6.2、通高22.5厘米"},{"器物编号":"M4:1","器物名称":"A型陶釜","材质":"陶器","器型":"釜","数量":"1","特征描述":"泥质灰陶，束颈垂腹。口径51.5、底径15.5、通高38厘米"},{"器物编号":"M4:18","器物名称":"B型陶釜","材质":"陶器","器型":"釜","数量":"1","特征描述":"泥质灰陶，斜曲腹。口径45.2、底径11.5、通高22.7厘米"},{"器物编号":"M4:21","器物名称":"A型陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":"泥质灰陶，鼓肩。口径13.1、底径13.7、高22厘米"},{"器物编号":"M4:B罐","器物名称":"B型陶罐","材质":"陶器","器型":"罐","数量":"12","特征描述":"花瓣纹和方形戳点纹"},{"器物编号":"M4:23","器物名称":"陶盆","材质":"陶器","器型":"盆","数量":"1","特征描述":"泥质红陶，口径23.5、底径11、高9.5厘米"},{"器物编号":"M4:22","器物名称":"陶鼎","材质":"陶器","器型":"鼎","数量":"1","特征描述":"泥质灰陶，矮兽面足。口径27.6、高14厘米"},{"器物编号":"M4:71","器物名称":"A型陶奁","材质":"陶器","器型":"奁","数量":"1","特征描述":"鞋底状。长36、高18厘米"},{"器物编号":"M4:19","器物名称":"B型陶奁","材质":"陶器","器型":"奁","数量":"1","特征描述":"筒状。口径24、高18.6厘米"},{"器物编号":"M4:5","器物名称":"A型陶案","材质":"陶器","器型":"案","数量":"1","特征描述":"长方形，案面施白衣红彩。长63.5、宽43.2、高2厘米"},{"器物编号":"M4:4","器物名称":"B型陶案","材质":"陶器","器型":"案","数量":"2","特征描述":"圆形，案面施红彩。直径38.8、高1.5厘米"},{"器物编号":"M4:盘","器物名称":"陶盘","材质":"陶器","器型":"盘","数量":"16","特征描述":"分A型15件、B型1件"},{"器物编号":"M4:碗","器物名称":"陶碗","材质":"陶器","器型":"碗","数量":"4","特征描述":""},{"器物编号":"M4:耳杯","器物名称":"陶耳杯","材质":"陶器","器型":"耳杯","数量":"8","特征描述":""},{"器物编号":"M4:灯","器物名称":"陶灯","材质":"陶器","器型":"灯","数量":"1","特征描述":""},{"器物编号":"M4:井","器物名称":"陶井","材质":"陶器","器型":"井","数量":"1","特征描述":""},{"器物编号":"M4:磨","器物名称":"陶磨","材质":"陶器","器型":"磨","数量":"1","特征描述":""},{"器物编号":"M4:灶","器物名称":"陶灶","材质":"陶器","器型":"灶","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.95,"model_confidence_label":"高","location_group":"武邑县刘疃乡中角村北","site_position":{"x":-43.5,"z":124.2,"group":"武邑县刘疃乡中角村北","method":"同发掘位置分组网格推断"}},{"id":"侍中村M1","name":"圆形砖室墓（仿木结构）","source":"hebei-1.csv","年代":"宋代","墓向":"北偏西5°","墓葬形制":"圆形砖室墓（仿木结构）","墓口长":"2.72","墓口宽":"2.72","墓深":"3.02","length":2.72,"width":2.72,"depth":3.02,"发掘位置":"柏乡县南马乡侍中村","层位":"","备注":"穹窿顶，仿木结构。棺床高0.25米。人骨架2具。","器物":["铜镜（青铜器）","铜钱（货币 / 钱币）×19","两釉四系瓶（瓷器）","深腹盘（瓷器）","瓷碗（瓷器）×6"],"artifacts":[{"器物编号":"M1:1","器物名称":"铜镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":"圆形，饰四夔四凤四鸟及云纹。径19.9厘米"},{"器物编号":"M1:2","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"19","特征描述":"宣和、元丰、熙宁、圣宋等年号"},{"器物编号":"M1:3","器物名称":"两釉四系瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":"白釉黑彩花卉。口径5、足径9.9、通高30.3厘米"},{"器物编号":"M1:4","器物名称":"深腹盘","材质":"瓷器","器型":"盘","数量":"1","特征描述":"白釉。口径21.6厘米"},{"器物编号":"M1:5","器物名称":"瓷碗","材质":"瓷器","器型":"碗","数量":"6","特征描述":"分I式4件、II式1件、III式1件"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.88,"model_confidence_label":"高","location_group":"柏乡县南马乡侍中村","site_position":{"x":10.5,"z":37.8,"group":"柏乡县南马乡侍中村","method":"同发掘位置分组网格推断"}},{"id":"侍中村M2","name":"方形砖室墓（攒尖顶，仿木结构）","source":"hebei-1.csv","年代":"宋代","墓向":"","墓葬形制":"方形砖室墓（攒尖顶，仿木结构）","墓口长":"2.55","墓口宽":"2.55","墓深":"2.4","length":2.55,"width":2.55,"depth":2.4,"发掘位置":"柏乡县南马乡侍中村","层位":"","备注":"彩画以荷花、植物花卉为主。人骨架2具，头西脚东。","器物":["双鱼大定钱纹镜（青铜器）","两釉四系瓶（瓷器）","深腹盘（瓷器）","浅腹碗（瓷器）×2"],"artifacts":[{"器物编号":"M2:1","器物名称":"双鱼大定钱纹镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":"饰双鲤纹，左侧有'大定通宝'钱纹。径17.8厘米"},{"器物编号":"M2:2","器物名称":"两釉四系瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":"白釉蓝青色花卉，下部黑褐釉。口部残缺"},{"器物编号":"M2:3","器物名称":"深腹盘","材质":"瓷器","器型":"盘","数量":"1","特征描述":"白釉泛青。口径19.2厘米"},{"器物编号":"M2:4","器物名称":"浅腹碗","材质":"瓷器","器型":"碗","数量":"2","特征描述":"两色釉。口径14.5厘米"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.84,"model_confidence_label":"高","location_group":"柏乡县南马乡侍中村","site_position":{"x":15.5,"z":37.8,"group":"柏乡县南马乡侍中村","method":"同发掘位置分组网格推断"}},{"id":"北新城M1","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":["双系陶罐（陶器）","铜带扣（青铜器）","开元通宝（货币 / 钱币）×2"],"artifacts":[{"器物编号":"94STBM1:1","器物名称":"双系陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":"口径19、腹径28.2、高28.8厘米"},{"器物编号":"94STBM1:2","器物名称":"铜带扣","材质":"青铜器","器型":"带扣","数量":"1","特征描述":"马蹄形。长5.6、宽3.1厘米"},{"器物编号":"94STBM1:3","器物名称":"开元通宝","材质":"货币","器型":"钱币","数量":"2","特征描述":"背面穿下有覆月形记号"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":-7.5,"z":-1.8,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M2","name":"石室墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"石室墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":-2.5,"z":-1.8,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M3","name":"石室墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"石室墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":["龟形陶砚（陶器）"],"artifacts":[{"器物编号":"94STBM3:1","器物名称":"龟形陶砚","材质":"陶器","器型":"砚","数量":"1","特征描述":"扭颈昂首，形象生动。头高6.5、背高4、砚宽8厘米"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":2.5,"z":-1.8,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M4","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"185°","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":["白瓷碗（瓷器）×3","黄釉双系瓷罐（瓷器）"],"artifacts":[{"器物编号":"94STBM4:2","器物名称":"白瓷碗","材质":"瓷器","器型":"碗","数量":"3","特征描述":"敞口，假圈足。口径13.7、高4.6厘米"},{"器物编号":"94STBM4:4","器物名称":"黄釉双系瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":"口径5.2、高11.7厘米"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":7.5,"z":-1.8,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M5","name":"石室墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"石室墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":["陶盘（陶器）","陶器座"],"artifacts":[{"器物编号":"94STBM5:1","器物名称":"陶盘","材质":"陶器","器型":"盘","数量":"1","特征描述":"底部阴刻'张元诠'三字。口径26.9厘米"},{"器物编号":"94STBM5:2","器物名称":"陶器座","材质":"陶器","器型":"器座","数量":"1","特征描述":"菌盖形，刻'元淇'。高6.8厘米"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":-7.5,"z":3.2,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M6","name":"竖穴砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"185°","墓葬形制":"竖穴砖室墓","墓口长":"3.1","墓口宽":"1.65","墓深":"1.45","length":3.1,"width":1.65,"depth":1.45,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"parametric","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"鹿泉市北新城","site_position":{"x":-2.5,"z":3.2,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M7","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":2.5,"z":3.2,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"北新城M8","name":"竖穴砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"竖穴砖室墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"鹿泉市北新城","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市北新城","site_position":{"x":7.5,"z":3.2,"group":"鹿泉市北新城","method":"同发掘位置分组网格推断"}},{"id":"南海山北M1","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"175°","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-43.5,"z":0.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M10","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-38.5,"z":10.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M11","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-33.5,"z":10.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M12","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-28.5,"z":10.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M13","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-43.5,"z":15.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M14","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-38.5,"z":15.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M15","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-33.5,"z":15.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M16","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-28.5,"z":15.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M17","name":"长方形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"95°","墓葬形制":"长方形砖室墓","墓口长":"2.18","墓口宽":"0.82","墓深":"2.0","length":2.18,"width":0.82,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"parametric","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"鹿泉市南海山北墓区","site_position":{"x":-43.5,"z":20.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M2","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-38.5,"z":0.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M3","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"184°","墓葬形制":"圆形砖室墓","墓口长":"2.5","墓口宽":"2.5","墓深":"2.26","length":2.5,"width":2.5,"depth":2.26,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"保存较完整。仿木结构门楼，砖雕斗栱。穹窿顶。男性骨架1具。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.84,"model_confidence_label":"高","location_group":"鹿泉市南海山北墓区","site_position":{"x":-33.5,"z":0.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M4","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-28.5,"z":0.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M5","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-43.5,"z":5.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M6","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-38.5,"z":5.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M7","name":"圆形砖室墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"圆形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-33.5,"z":5.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M8","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-28.5,"z":5.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山北M9","name":"横室土洞墓","source":"hebei-1.csv","年代":"唐代","墓向":"180°","墓葬形制":"横室土洞墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"鹿泉市南海山北墓区","层位":"","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山北墓区","site_position":{"x":-43.5,"z":10.0,"group":"鹿泉市南海山北墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山南M1","name":"土洞墓/土坑墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"土洞墓/土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"鹿泉市南海山南墓区","层位":"","备注":"报告中未提供详细描述","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山南墓区","site_position":{"x":-7.5,"z":19.8,"group":"鹿泉市南海山南墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山南M2","name":"土洞墓/土坑墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"土洞墓/土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"鹿泉市南海山南墓区","层位":"","备注":"报告中未提供详细描述","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山南墓区","site_position":{"x":-2.5,"z":19.8,"group":"鹿泉市南海山南墓区","method":"同发掘位置分组网格推断"}},{"id":"南海山南M3","name":"土洞墓/土坑墓","source":"hebei-1.csv","年代":"唐代","墓向":"","墓葬形制":"土洞墓/土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"鹿泉市南海山南墓区","层位":"","备注":"报告中未提供详细描述","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"鹿泉市南海山南墓区","site_position":{"x":2.5,"z":19.8,"group":"鹿泉市南海山南墓区","method":"同发掘位置分组网格推断"}},{"id":"双碑M1","name":"竖穴壁龛墓","source":"hebei-1.csv","年代":"汉代","墓向":"20°","墓葬形制":"竖穴壁龛墓","墓口长":"2.46","墓口宽":"0.97","墓深":"1.6","length":2.46,"width":0.97,"depth":1.6,"发掘位置":"II区T1","层位":"开口于①层下","备注":"乙类墓","器物":["Ab型陶壶（陶器）×2"],"artifacts":[{"器物编号":"M1:1","器物名称":"Ab型陶壶","材质":"陶器","器型":"壶","数量":"2","特征描述":"方唇，子口，肩饰三角戳印纹带"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.84,"model_confidence_label":"高","location_group":"II区T1","site_position":{"x":-22.2,"z":72.0,"group":"II区T1","method":"发掘位置T号推断"}},{"id":"双碑M10","name":"竖穴砖圹墓（甲类）","source":"hebei-1.csv","年代":"汉代","墓向":"","墓葬形制":"竖穴砖圹墓（甲类）","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"II区T10","层位":"开口于①层下","备注":"甲类墓","器物":["Ab型陶壶（陶器）","Aa型陶壶（陶器）","五铢钱（货币 / 钱币）"],"artifacts":[{"器物编号":"M10:1","器物名称":"Ab型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，子口。口径10.4、腹径24、底径9.6、高28.8厘米"},{"器物编号":"M10:2","器物名称":"Aa型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，沿面内凹。口径10.4、腹径19.2、底径15.2、高24厘米"},{"器物编号":"M10:五铢","器物名称":"五铢钱","材质":"货币","器型":"钱币","数量":"1","特征描述":""}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"II区T10","site_position":{"x":12.6,"z":19.2,"group":"II区T10","method":"发掘位置T号推断"}},{"id":"双碑M11","name":"竖穴土坑墓（丙类）","source":"hebei-1.csv","年代":"汉代","墓向":"","墓葬形制":"竖穴土坑墓（丙类）","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"II区","层位":"开口于①层下","备注":"丙类墓","器物":["陶罐（陶器）","Aa型陶壶（陶器）"],"artifacts":[{"器物编号":"M11:1","器物名称":"陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":"尖圆唇，盘口。口径14、腹径23.2、底径7.2、高29.4厘米"},{"器物编号":"M11:2","器物名称":"Aa型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，子口。口径11.2、腹径16、底径11.6、高20.4厘米"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"II区","site_position":{"x":-43.5,"z":72,"group":"II区","method":"同发掘位置分组网格推断"}},{"id":"双碑M4","name":"竖穴壁龛墓","source":"hebei-1.csv","年代":"汉代","墓向":"192°","墓葬形制":"竖穴壁龛墓","墓口长":"2.6","墓口宽":"0.85","墓深":"0.55","length":2.6,"width":0.85,"depth":0.55,"发掘位置":"II区T7","层位":"开口于①层下","备注":"乙类墓。底部有白灰面","器物":["陶罐（陶器）","Ab型陶壶（陶器）","陶瓮（陶器）"],"artifacts":[{"器物编号":"M4:1","器物名称":"陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":""},{"器物编号":"M4:2","器物名称":"Ab型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，子口。口径10.4、腹径20、底径8、高23厘米"},{"器物编号":"M4:3","器物名称":"陶瓮","材质":"陶器","器型":"瓮","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.84,"model_confidence_label":"高","location_group":"II区T7","site_position":{"x":21.0,"z":72.0,"group":"II区T7","method":"发掘位置T号推断"}},{"id":"双碑M5","name":"竖穴土坑墓（丙类）","source":"hebei-1.csv","年代":"汉代","墓向":"190°","墓葬形制":"竖穴土坑墓（丙类）","墓口长":"3.5","墓口宽":"0.9","墓深":"0.85","length":3.5,"width":0.9,"depth":0.85,"发掘位置":"II区T6","层位":"开口于①层下","备注":"丙类墓","器物":["Bb型陶壶（陶器）","陶瓮（陶器）"],"artifacts":[{"器物编号":"M5:1","器物名称":"Bb型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，盘口，颈较长，肩腹饰三组凸弦纹。口径14.4、腹径27.2、底径16.8、高37.6厘米"},{"器物编号":"M5:4","器物名称":"陶瓮","材质":"陶器","器型":"瓮","数量":"1","特征描述":"圆唇，口微侈，矮领，鼓腹，小平底。下腹施压印纹。口径12、腹径28、底径7.2、高25.6厘米"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"II区T6","site_position":{"x":1.8,"z":72.0,"group":"II区T6","method":"发掘位置T号推断"}},{"id":"双碑M7","name":"竖穴土坑墓（丙类）","source":"hebei-1.csv","年代":"汉代","墓向":"3°","墓葬形制":"竖穴土坑墓（丙类）","墓口长":"3.35","墓口宽":"1.0","墓深":"1.7","length":3.35,"width":1.0,"depth":1.7,"发掘位置":"II区T9","层位":"开口于①层下","备注":"丙类墓","器物":["Aa型陶壶（陶器）","陶瓮（陶器）"],"artifacts":[{"器物编号":"M7:3","器物名称":"Aa型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，子口。口径10.4、腹径20.4、底径16、高25.6厘米"},{"器物编号":"M7:4","器物名称":"陶瓮","材质":"陶器","器型":"瓮","数量":"1","特征描述":"口径17.6、腹径32、高25.6厘米"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"II区T9","site_position":{"x":41.4,"z":72.0,"group":"II区T9","method":"发掘位置T号推断"}},{"id":"双碑M8","name":"竖穴砖圹墓（甲类）","source":"hebei-1.csv","年代":"汉代","墓向":"10°","墓葬形制":"竖穴砖圹墓（甲类）","墓口长":"4.0","墓口宽":"1.06","墓深":"2.05","length":4.0,"width":1.06,"depth":2.05,"发掘位置":"II区T9东","层位":"开口于①层下","备注":"甲类墓。砖圹高90厘米，白灰面。未见人骨。","器物":["Ba型陶壶（陶器）","Aa型陶壶（陶器）","陶碗（陶器）×4","陶鼎（陶器）","陶盒（陶器）"],"artifacts":[{"器物编号":"M8:1","器物名称":"Ba型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，侈口，圈足。腹饰衔环铺首。口径15.2、腹径31.2、底径15.6、高36厘米"},{"器物编号":"M8:7","器物名称":"Aa型陶壶","材质":"陶器","器型":"壶","数量":"1","特征描述":"方唇，肩腹饰弦纹。口径10.4、腹径20.8、底径15.2、高25.6厘米"},{"器物编号":"M8:碗","器物名称":"陶碗","材质":"陶器","器型":"碗","数量":"4","特征描述":""},{"器物编号":"M8:鼎","器物名称":"陶鼎","材质":"陶器","器型":"鼎","数量":"1","特征描述":""},{"器物编号":"M8:盒","器物名称":"陶盒","材质":"陶器","器型":"盒","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"II区T9东","site_position":{"x":-28.8,"z":90.0,"group":"II区T9东","method":"发掘位置T号推断"}},{"id":"双碑M9","name":"竖穴土坑墓（丙类）","source":"hebei-1.csv","年代":"汉代","墓向":"93°","墓葬形制":"竖穴土坑墓（丙类）","墓口长":"3.17","墓口宽":"0.86","墓深":"1.8","length":3.17,"width":0.86,"depth":1.8,"发掘位置":"II区T10","层位":"开口于①层下","备注":"丙类墓","器物":["陶罐（陶器）","Aa型陶壶（陶器）×2","五铢钱（货币 / 钱币）"],"artifacts":[{"器物编号":"M9:3","器物名称":"陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":"尖圆唇，盘口，上腹饰弦纹，下腹饰绳纹。口径12、腹径23.2、高28.8厘米"},{"器物编号":"M9:壶","器物名称":"Aa型陶壶","材质":"陶器","器型":"壶","数量":"2","特征描述":""},{"器物编号":"M9:五铢","器物名称":"五铢钱","材质":"货币","器型":"钱币","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"II区T10","site_position":{"x":12.6,"z":19.2,"group":"II区T10","method":"发掘位置T号推断"}},{"id":"史氏M1","name":"八角八边形砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"八角八边形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"石家庄后太保村","层位":"","备注":"多角多边形。仿木结构门楼，砖雕斗栱。被盗严重。供桌、棺床。3具人骨（1男2女）。出土青瓷梅瓶、龙泉青瓷碗、钧瓷碗、官窑碗、铜香炉等。","器物":["青瓷梅瓶（瓷器）","龙泉青瓷碗（瓷器）×2","钧瓷碗（瓷器）","官窑瓷碗（瓷器）","四足铜香炉（青铜器）","铜狮纽熏炉盖（青铜器）"],"artifacts":[{"器物编号":"M1:梅瓶","器物名称":"青瓷梅瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":""},{"器物编号":"M1:碗","器物名称":"龙泉青瓷碗","材质":"瓷器","器型":"碗","数量":"2","特征描述":""},{"器物编号":"M1:钧瓷","器物名称":"钧瓷碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":""},{"器物编号":"M1:官窑","器物名称":"官窑瓷碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":""},{"器物编号":"M1:香炉","器物名称":"四足铜香炉","材质":"青铜器","器型":"炉","数量":"1","特征描述":"盛满香灰"},{"器物编号":"M1:熏炉","器物名称":"铜狮纽熏炉盖","材质":"青铜器","器型":"炉","数量":"1","特征描述":"下部已不存"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.44,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-25.5,"z":0,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M10","name":"砖石混筑单室墓","source":"hebei-1.csv","年代":"元代","墓向":"","墓葬形制":"砖石混筑单室墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"石家庄后太保村","层位":"","备注":"出土双系瓷罐、瓷盘。铜钱31枚（含骨质义钱1枚）。","器物":["双系瓷罐（瓷器）","瓷盘（瓷器）","铜钱（货币 / 钱币）×31"],"artifacts":[{"器物编号":"M10:1","器物名称":"双系瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":"铅灰釉。口径14.6、高17.5厘米"},{"器物编号":"M10:2","器物名称":"瓷盘","材质":"瓷器","器型":"盘","数量":"1","特征描述":"白釉泛青黄。口径30厘米"},{"器物编号":"M10:铜钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"31","特征描述":"开元通宝、太平通宝、至道元宝、大定通宝等15种"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-25.5,"z":10,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M2","name":"石板砌成单室墓","source":"hebei-1.csv","年代":"元代","墓向":"185°","墓葬形制":"石板砌成单室墓","墓口长":"1.7","墓口宽":"0.35","墓深":"0.4","length":1.7,"width":0.35,"depth":0.4,"发掘位置":"石家庄后太保村","层位":"","备注":"唯一未被盗扰的墓。石板砌成墓室。棺保存完好，内外涂黑漆和红漆。头发保存完好。随葬金梳背、金簪、铜簪、金耳坠、水晶珠、玛瑙珠、玉珠、莲花玉饰、玻璃饰、金币等。","器物":["金梳背（金银器）","金簪（金银器）","铜簪（青铜器）×2","金耳坠（金银器）×2","水晶珠（玉石器 / 串珠）","玛瑙珠（玉石器 / 串珠）×7","玉珠（玉石器 / 串珠）×2","莲花玉饰（玉石器 / 饰件）","玻璃饰（料器 / 饰件）×12","金币（货币 / 钱币）×6","珍珠（玉石器 / 串珠）×55","铜钱（货币 / 钱币）×32","泥佛（陶器 / 俑）×4"],"artifacts":[{"器物编号":"M2:5","器物名称":"金梳背","材质":"金银器","器型":"梳背","数量":"1","特征描述":""},{"器物编号":"M2:6","器物名称":"金簪","材质":"金银器","器型":"簪","数量":"1","特征描述":""},{"器物编号":"M2:7","器物名称":"铜簪","材质":"青铜器","器型":"簪","数量":"2","特征描述":""},{"器物编号":"M2:8","器物名称":"金耳坠","材质":"金银器","器型":"耳坠","数量":"2","特征描述":""},{"器物编号":"M2:17","器物名称":"水晶珠","材质":"玉石器","器型":"串珠","数量":"1","特征描述":""},{"器物编号":"M2:玛瑙","器物名称":"玛瑙珠","材质":"玉石器","器型":"串珠","数量":"7","特征描述":""},{"器物编号":"M2:27","器物名称":"玉珠","材质":"玉石器","器型":"串珠","数量":"2","特征描述":""},{"器物编号":"M2:28","器物名称":"莲花玉饰","材质":"玉石器","器型":"饰件","数量":"1","特征描述":""},{"器物编号":"M2:玻璃","器物名称":"玻璃饰","材质":"料器","器型":"饰件","数量":"12","特征描述":""},{"器物编号":"M2:金币","器物名称":"金币","材质":"货币","器型":"钱币","数量":"6","特征描述":""},{"器物编号":"M2:珍珠","器物名称":"珍珠","材质":"玉石器","器型":"串珠","数量":"55","特征描述":""},{"器物编号":"M2:铜钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"32","特征描述":""},{"器物编号":"M2:泥佛","器物名称":"泥佛","材质":"陶器","器型":"俑","数量":"4","特征描述":"置于棺内四角"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 1.7m 推断","墓口宽按形制默认值 0.35m 推断","墓深按形制默认值 0.4m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-20.5,"z":0,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M3","name":"六角六边形砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"六角六边形砖室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"石家庄后太保村","层位":"","备注":"台阶墓道长13米。仿木结构门楼，单抄四铺作斗栱。供桌、棺床。2个人头骨，6具狗骨架（随葬）。出土龙泉青瓷匜、黑瓷罐、钧瓷碗等。","器物":["钩釉瓷碗（瓷器）×2","瓷盘（瓷器）×4","龙泉青瓷匜（瓷器）","黑瓷罐（瓷器）","狗骨架（其他 / 随葬动物）×6"],"artifacts":[{"器物编号":"M3:碗","器物名称":"钩釉瓷碗","材质":"瓷器","器型":"碗","数量":"2","特征描述":""},{"器物编号":"M3:盘","器物名称":"瓷盘","材质":"瓷器","器型":"盘","数量":"4","特征描述":""},{"器物编号":"M3:匜","器物名称":"龙泉青瓷匜","材质":"瓷器","器型":"匜","数量":"1","特征描述":""},{"器物编号":"M3:罐","器物名称":"黑瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":""},{"器物编号":"M3:狗","器物名称":"狗骨架","材质":"其他","器型":"随葬动物","数量":"6","特征描述":"姿态各异，应为随葬品"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.48,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-15.5,"z":0,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M5","name":"方形单室砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"方形单室砖室墓","墓口长":"2.8","墓口宽":"2.8","墓深":"2.4","length":2.8,"width":2.8,"depth":2.4,"发掘位置":"石家庄后太保村","层位":"","备注":"墓道长4米。棺床。火烧过的人骨碎块。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 2.8m 推断","墓口宽按形制默认值 2.8m 推断","墓深按形制默认值 2.4m 推断"],"model_confidence":0.36,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-10.5,"z":0,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M6","name":"方形单室砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"方形单室砖室墓","墓口长":"2.8","墓口宽":"2.8","墓深":"2.4","length":2.8,"width":2.8,"depth":2.4,"发掘位置":"石家庄后太保村","层位":"","备注":"全长13米。铜钱和零乱人骨，至少两人合葬。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 2.8m 推断","墓口宽按形制默认值 2.8m 推断","墓深按形制默认值 2.4m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-25.5,"z":5,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M7","name":"石室墓（上下两层）","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"石室墓（上下两层）","墓口长":"1.7","墓口宽":"0.35","墓深":"0.4","length":1.7,"width":0.35,"depth":0.4,"发掘位置":"石家庄后太保村","层位":"","备注":"上层为圆形砖室墓，下层为石板墓室。石板分隔为东西两室。出土'大吉'金币3枚。全长16.76米。","器物":["大吉金币（货币 / 钱币）×3","铜镜（青铜器）","粗雕石狮（玉石器 / 雕像）"],"artifacts":[{"器物编号":"M7:金币","器物名称":"大吉金币","材质":"货币","器型":"钱币","数量":"3","特征描述":"出于东棺"},{"器物编号":"M7:铜镜","器物名称":"铜镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":"半块"},{"器物编号":"M7:石狮","器物名称":"粗雕石狮","材质":"玉石器","器型":"雕像","数量":"1","特征描述":"出于盗洞口附近"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 1.7m 推断","墓口宽按形制默认值 0.35m 推断","墓深按形制默认值 0.4m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-20.5,"z":5,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M8","name":"圆形仿木结构砖砌单室墓","source":"hebei-1.csv","年代":"元代","墓向":"192°","墓葬形制":"圆形仿木结构砖砌单室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"石家庄后太保村","层位":"","备注":"斜坡墓道长4.80米。穹窿顶。仿木结构门楼、灯檠、壁龛。3具人骨架（2女1男）。出土'家常贵富'铭铜镜、瓷罐、瓷碟、灯碗、铁铧。","器物":["'家常贵富'铭铜镜（青铜器）","双系瓷罐（瓷器）","瓷碟（瓷器）","瓷灯碗（瓷器）","铁铧（铁器）","铜钱（货币 / 钱币）×4"],"artifacts":[{"器物编号":"M8:镜","器物名称":"'家常贵富'铭铜镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":"悬于墓顶中央"},{"器物编号":"M8:2","器物名称":"双系瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":"酱釉。口径13.8、高15厘米"},{"器物编号":"M8:3","器物名称":"瓷碟","材质":"瓷器","器型":"碟","数量":"1","特征描述":"白釉泛青黄。口径14.9厘米"},{"器物编号":"M8:4","器物名称":"瓷灯碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":"酱釉，碗心油渍尚存。口径8.4厘米"},{"器物编号":"M8:1","器物名称":"铁铧","材质":"铁器","器型":"铧","数量":"1","特征描述":"锈蚀严重，三角形"},{"器物编号":"M8:铜钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"4","特征描述":""}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.44,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-15.5,"z":5,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"史氏M9","name":"砖石混筑单室墓","source":"hebei-1.csv","年代":"元代","墓向":"195°","墓葬形制":"砖石混筑单室墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"石家庄后太保村","层位":"","备注":"全长7.5米。圆形墓室，内径2.16×2.40米。周壁河光石垒砌。3具人架（1男2女）。出土瓷罐、瓷碟、灯碗、铁铧。铜钱12枚。","器物":["双系瓷罐（瓷器）","瓷碟（瓷器）","瓷灯碗（瓷器）","铁铧（铁器）","铜钱（货币 / 钱币）×12"],"artifacts":[{"器物编号":"M9:2","器物名称":"双系瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":"酱釉。口径13.8、高15厘米"},{"器物编号":"M9:3","器物名称":"瓷碟","材质":"瓷器","器型":"碟","数量":"1","特征描述":"白釉泛青黄。口径14.9厘米"},{"器物编号":"M9:4","器物名称":"瓷灯碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":"酱釉。口径8.4厘米"},{"器物编号":"M9:1","器物名称":"铁铧","材质":"铁器","器型":"铧","数量":"1","特征描述":"锈蚀严重"},{"器物编号":"M9:5","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"12","特征描述":"开元通宝、咸平元宝、祥符通宝、天圣元宝、熙宁元宝、元丰通宝、崇宁重宝、政和通宝"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"石家庄后太保村","site_position":{"x":-10.5,"z":5,"group":"石家庄后太保村","method":"同发掘位置分组网格推断"}},{"id":"小驿头M10","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国","墓向":"170°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.8","墓口宽":"1.3","墓深":"1.4","length":2.8,"width":1.3,"depth":1.4,"发掘位置":"内邱小驿头T87","层位":"开口于①层下","备注":"完，男，侧身屈肢，面向西，棺","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T87","site_position":{"x":3.0,"z":45.6,"group":"内邱小驿头T87","method":"发掘位置T号推断"}},{"id":"小驿头M11","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国中期","墓向":"5°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.3","墓口宽":"1.1","墓深":"2.14","length":2.3,"width":1.1,"depth":2.14,"发掘位置":"内邱小驿头T81","层位":"开口于①层下","备注":"完，男，侧身屈肢，面向东，棺。头龛宽0.60、深0.28、高0.40米","器物":["印章（青铜器）"],"artifacts":[{"器物编号":"M11:9","器物名称":"印章","材质":"青铜器","器型":"印章","数量":"1","特征描述":"方形朱纹小印，鼻纽，印纹为'司马藤'三字。长宽1.3厘米"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"内邱小驿头T81","site_position":{"x":-40.2,"z":117.6,"group":"内邱小驿头T81","method":"发掘位置T号推断"}},{"id":"小驿头M12","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋中期","墓向":"5°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.1","墓口宽":"1.1","墓深":"1.7","length":2.1,"width":1.1,"depth":1.7,"发掘位置":"内邱小驿头T71","层位":"开口于①层下","备注":"完，女？，侧身屈肢，面向东，棺","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T71","site_position":{"x":-22.2,"z":44.4,"group":"内邱小驿头T71","method":"发掘位置T号推断"}},{"id":"小驿头M13","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋中期","墓向":"2°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.4","墓口宽":"1.0","墓深":"1.9","length":2.4,"width":1.0,"depth":1.9,"发掘位置":"内邱小驿头T71","层位":"开口于①层下","备注":"完，男，仰身直肢，面向东","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T71","site_position":{"x":-22.2,"z":44.4,"group":"内邱小驿头T71","method":"发掘位置T号推断"}},{"id":"小驿头M14","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋中期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头T8","层位":"开口于①层下","备注":"扰","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头T8","site_position":{"x":40.2,"z":90.0,"group":"内邱小驿头T8","method":"发掘位置T号推断"}},{"id":"小驿头M16","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国中期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头","site_position":{"x":10.5,"z":0,"group":"内邱小驿头","method":"同发掘位置分组网格推断"}},{"id":"小驿头M19","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国早期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头","site_position":{"x":15.5,"z":0,"group":"内邱小驿头","method":"同发掘位置分组网格推断"}},{"id":"小驿头M2","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国早期","墓向":"16°","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.2","墓口宽":"2.04","墓深":"1.8","length":3.2,"width":2.04,"depth":1.8,"发掘位置":"内邱小驿头T106","层位":"开口于①层下","备注":"扰，棺椁","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T106","site_position":{"x":19.8,"z":102.0,"group":"内邱小驿头T106","method":"发掘位置T号推断"}},{"id":"小驿头M20","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋中期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头","site_position":{"x":20.5,"z":0,"group":"内邱小驿头","method":"同发掘位置分组网格推断"}},{"id":"小驿头M21","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国早期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头","site_position":{"x":25.5,"z":0,"group":"内邱小驿头","method":"同发掘位置分组网格推断"}},{"id":"小驿头M22","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国中期","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头","site_position":{"x":10.5,"z":5,"group":"内邱小驿头","method":"同发掘位置分组网格推断"}},{"id":"小驿头M23","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头II区","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头II区","site_position":{"x":28.5,"z":18,"group":"内邱小驿头II区","method":"同发掘位置分组网格推断"}},{"id":"小驿头M24","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头II区","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头II区","site_position":{"x":33.5,"z":18,"group":"内邱小驿头II区","method":"同发掘位置分组网格推断"}},{"id":"小驿头M25","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"内邱小驿头II区北部","层位":"开口于①层下","备注":"","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"内邱小驿头II区北部","site_position":{"x":-7.5,"z":88.2,"group":"内邱小驿头II区北部","method":"同发掘位置分组网格推断"}},{"id":"小驿头M4","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国早期","墓向":"3°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.6","墓口宽":"1.3","墓深":"1.76","length":2.6,"width":1.3,"depth":1.76,"发掘位置":"内邱小驿头T96","层位":"开口于①层下","备注":"扰，棺椁","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T96","site_position":{"x":1.8,"z":118.8,"group":"内邱小驿头T96","method":"发掘位置T号推断"}},{"id":"小驿头M5","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋？","墓向":"2°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.0","墓口宽":"1.0","墓深":"1.56","length":2.0,"width":1.0,"depth":1.56,"发掘位置":"内邱小驿头T108","层位":"开口于①层下","备注":"好，男，侧身屈肢，面向西","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T108","site_position":{"x":-31.8,"z":48.0,"group":"内邱小驿头T108","method":"发掘位置T号推断"}},{"id":"小驿头M6","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"战国早期","墓向":"15°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.5","墓口宽":"1.2","墓深":"2.3","length":2.5,"width":1.2,"depth":2.3,"发掘位置":"内邱小驿头T108","层位":"开口于①层下","备注":"好，侧身屈肢，面向西，棺椁","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T108","site_position":{"x":-31.8,"z":48.0,"group":"内邱小驿头T108","method":"发掘位置T号推断"}},{"id":"小驿头M7","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋晚期","墓向":"10°","墓葬形制":"长方形竖穴土坑墓","墓口长":"2.6","墓口宽":"1.4","墓深":"1.6","length":2.6,"width":1.4,"depth":1.6,"发掘位置":"内邱小驿头T95","层位":"开口于①层下","备注":"扰","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T95","site_position":{"x":-17.4,"z":118.8,"group":"内邱小驿头T95","method":"发掘位置T号推断"}},{"id":"小驿头M8","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"春秋？","墓向":"94°","墓葬形制":"长方形竖穴土坑墓","墓口长":"1.6","墓口宽":"0.7","墓深":"1.0","length":1.6,"width":0.7,"depth":1.0,"发掘位置":"内邱小驿头T87","层位":"开口于①层下","备注":"完，女，侧身屈肢，面向南","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"内邱小驿头T87","site_position":{"x":3.0,"z":45.6,"group":"内邱小驿头T87","method":"发掘位置T号推断"}},{"id":"岳村铺M1","name":"前后室砖室墓","source":"hebei-1.csv","年代":"汉代","墓向":"280°","墓葬形制":"前后室砖室墓","墓口长":"17.7","墓口宽":"3.7","墓深":"3.2","length":17.7,"width":3.7,"depth":3.2,"发掘位置":"石家庄市郊岳村铺","层位":"","备注":"多次被盗。墓道长7.95米，前室3.70×3.20米，后室4.0×3.35米。","器物":["陶罐（陶器）","陶案（陶器）","陶耳杯（陶器）×2","陶碗（陶器）","陶炉（陶器）","陶奁盒（陶器）","绿釉博山炉盖（陶器）","铜钱（货币 / 钱币）×15"],"artifacts":[{"器物编号":"M1:1","器物名称":"陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":"直口圆唇，鼓腹。口径26、底径15.5、高28.5厘米"},{"器物编号":"M1:2","器物名称":"陶案","材质":"陶器","器型":"案","数量":"1","特征描述":"长方形，涂朱。长63、宽43厘米"},{"器物编号":"M1:3","器物名称":"陶耳杯","材质":"陶器","器型":"耳杯","数量":"2","特征描述":"内壁涂朱"},{"器物编号":"M1:5","器物名称":"陶碗","材质":"陶器","器型":"碗","数量":"1","特征描述":"口径18.5、高7.2厘米"},{"器物编号":"M1:6","器物名称":"陶炉","材质":"陶器","器型":"炉","数量":"1","特征描述":"口径18.5、通高12厘米"},{"器物编号":"M1:7","器物名称":"陶奁盒","材质":"陶器","器型":"奁","数量":"1","特征描述":"长方形。长39、宽16、高9厘米"},{"器物编号":"M1:8","器物名称":"绿釉博山炉盖","材质":"陶器","器型":"炉","数量":"1","特征描述":"泥质红陶，圆锥状，镂孔。残高6.5厘米"},{"器物编号":"M1:钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"15","特征描述":"半两1枚，五铢14枚"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.92,"model_confidence_label":"高","location_group":"石家庄市郊岳村铺","site_position":{"x":-43.5,"z":54,"group":"石家庄市郊岳村铺","method":"同发掘位置分组网格推断"}},{"id":"岳村铺M2","name":"单墓道单室砖墓","source":"hebei-1.csv","年代":"汉代","墓向":"0°","墓葬形制":"单墓道单室砖墓","墓口长":"3","墓口宽":"2","墓深":"2","length":3.0,"width":2.0,"depth":2.0,"发掘位置":"石家庄市郊岳村铺","层位":"","备注":"墓道长6.64米，阶梯式，共4个台阶。","器物":["布泉（货币 / 钱币）×2"],"artifacts":[{"器物编号":"M2:钱","器物名称":"布泉","材质":"货币","器型":"钱币","数量":"2","特征描述":""}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 2m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.36,"model_confidence_label":"低","location_group":"石家庄市郊岳村铺","site_position":{"x":-38.5,"z":54,"group":"石家庄市郊岳村铺","method":"同发掘位置分组网格推断"}},{"id":"张村M33","name":"方形券顶砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"方形券顶砖室墓","墓口长":"2.1","墓口宽":"2.05","墓深":"1.2","length":2.1,"width":2.05,"depth":1.2,"发掘位置":"涿州张村东营墓群","层位":"","备注":"双人合葬","器物":["A型釉陶罐（陶器）","瓷杯（瓷器）","铜镜（青铜器）"],"artifacts":[{"器物编号":"M33:1","器物名称":"A型釉陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":""},{"器物编号":"M33:2","器物名称":"瓷杯","材质":"瓷器","器型":"杯","数量":"1","特征描述":""},{"器物编号":"M33:3","器物名称":"铜镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"涿州张村东营墓群","site_position":{"x":30.3,"z":0,"group":"涿州张村东营墓群","method":"同发掘位置分组网格推断"}},{"id":"张村M35","name":"长方形券顶砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"长方形券顶砖室墓","墓口长":"2.4","墓口宽":"1.5","墓深":"0.9","length":2.4,"width":1.5,"depth":0.9,"发掘位置":"涿州张村东营墓群","层位":"","备注":"被盗扰，无骨架及随葬品","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"涿州张村东营墓群","site_position":{"x":35.3,"z":0,"group":"涿州张村东营墓群","method":"同发掘位置分组网格推断"}},{"id":"张村M36","name":"长方形土坑竖穴墓","source":"hebei-1.csv","年代":"汉代","墓向":"180°","墓葬形制":"长方形土坑竖穴墓","墓口长":"1.1","墓口宽":"0.25","墓深":"0.1","length":1.1,"width":0.25,"depth":0.1,"发掘位置":"涿州张村东营墓群北部","层位":"","备注":"儿童墓。因公路取土残深仅0.10米。","器物":["五铢钱（货币 / 钱币）×2","货泉（货币 / 钱币）","半两钱（货币 / 钱币）"],"artifacts":[{"器物编号":"M36:1","器物名称":"五铢钱","材质":"货币","器型":"钱币","数量":"2","特征描述":""},{"器物编号":"M36:2","器物名称":"货泉","材质":"货币","器型":"钱币","数量":"1","特征描述":""},{"器物编号":"M36:3","器物名称":"半两钱","材质":"货币","器型":"钱币","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"涿州张村东营墓群北部","site_position":{"x":30.3,"z":34.2,"group":"涿州张村东营墓群北部","method":"同发掘位置分组网格推断"}},{"id":"张村M37","name":"长方形土坑竖穴墓","source":"hebei-1.csv","年代":"汉代","墓向":"330°","墓葬形制":"长方形土坑竖穴墓","墓口长":"1.1","墓口宽":"0.25","墓深":"2","length":1.1,"width":0.25,"depth":2.0,"发掘位置":"涿州张村东营墓群北部","层位":"","备注":"儿童墓。无随葬品。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"inferred"},"dimension_notes":["墓深按形制默认值 2m 推断"],"model_confidence":0.6,"model_confidence_label":"中","location_group":"涿州张村东营墓群北部","site_position":{"x":35.3,"z":34.2,"group":"涿州张村东营墓群北部","method":"同发掘位置分组网格推断"}},{"id":"张村M38","name":"圆形券顶砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"圆形券顶砖室墓","墓口长":"2.9","墓口宽":"2.9","墓深":"1.62","length":2.9,"width":2.9,"depth":1.62,"发掘位置":"涿州张村东营墓群","层位":"","备注":"双人合葬","器物":["C型小口瓶（瓷器）","B型小口瓶（瓷器）","B型瓷碗（瓷器）","瓷杯（瓷器）"],"artifacts":[{"器物编号":"M38:2","器物名称":"C型小口瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":""},{"器物编号":"M38:4","器物名称":"B型小口瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":""},{"器物编号":"M38:5","器物名称":"B型瓷碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":""},{"器物编号":"M38:6","器物名称":"瓷杯","材质":"瓷器","器型":"杯","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"涿州张村东营墓群","site_position":{"x":40.3,"z":0,"group":"涿州张村东营墓群","method":"同发掘位置分组网格推断"}},{"id":"张村M41","name":"前圆后方形券顶砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"前圆后方形券顶砖室墓","墓口长":"2.46","墓口宽":"2.4","墓深":"1.8","length":2.46,"width":2.4,"depth":1.8,"发掘位置":"涿州张村东营墓群","层位":"","备注":"双人合葬","器物":["双耳陶罐（陶器）"],"artifacts":[{"器物编号":"M41:2","器物名称":"双耳陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"涿州张村东营墓群","site_position":{"x":45.3,"z":0,"group":"涿州张村东营墓群","method":"同发掘位置分组网格推断"}},{"id":"张村M42","name":"圆形券顶砖室墓","source":"hebei-1.csv","年代":"元代","墓向":"180°","墓葬形制":"圆形券顶砖室墓","墓口长":"2.9","墓口宽":"2.9","墓深":"1.62","length":2.9,"width":2.9,"depth":1.62,"发掘位置":"涿州张村东营墓群","层位":"","备注":"双人合葬，直径2.90米","器物":["B型釉陶罐（陶器）","双耳瓷罐（瓷器）","A型小口瓶（瓷器）","A型瓷碗（瓷器）","小口四系瓶（瓷器）","铁犁（铁器）","铜笄（青铜器）","铜钱（货币 / 钱币）"],"artifacts":[{"器物编号":"M42:1","器物名称":"B型釉陶罐","材质":"陶器","器型":"罐","数量":"1","特征描述":""},{"器物编号":"M42:2","器物名称":"双耳瓷罐","材质":"瓷器","器型":"罐","数量":"1","特征描述":"黑釉。口径11.2、腹径13.7、高11.5厘米"},{"器物编号":"M42:3","器物名称":"A型小口瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":""},{"器物编号":"M42:4","器物名称":"A型瓷碗","材质":"瓷器","器型":"碗","数量":"1","特征描述":"白釉黑彩。口径14.8、高5.2厘米"},{"器物编号":"M42:5","器物名称":"小口四系瓶","材质":"瓷器","器型":"瓶","数量":"1","特征描述":"白釉黑彩花卉。高29、口径4.8厘米"},{"器物编号":"M42:铁犁","器物名称":"铁犁","材质":"铁器","器型":"犁","数量":"1","特征描述":""},{"器物编号":"M42:铜笄","器物名称":"铜笄","材质":"青铜器","器型":"笄","数量":"1","特征描述":""},{"器物编号":"M42:铜钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"1","特征描述":""}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.8,"model_confidence_label":"高","location_group":"涿州张村东营墓群","site_position":{"x":30.3,"z":5,"group":"涿州张村东营墓群","method":"同发掘位置分组网格推断"}},{"id":"榆林M1","name":"小型砖室墓","source":"hebei-1.csv","年代":"汉代","墓向":"","墓葬形制":"小型砖室墓","墓口长":"1.5","墓口宽":"0.41","墓深":"1.1","length":1.5,"width":0.41,"depth":1.1,"发掘位置":"T2","层位":"开口于T2②层下，打破第③层","备注":"墓室东西向，墓主头向东。砖棺长1.45、宽0.35、高0.35米。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"T2","site_position":{"x":-21.0,"z":90.0,"group":"T2","method":"发掘位置T号推断"}},{"id":"牛圈子梁石棺墓群","name":"石棺墓（石板砌成）","source":"hebei-1.csv","年代":"春秋-战国","墓向":"南北向为主","墓葬形制":"石棺墓（石板砌成）","墓口长":"1.7","墓口宽":"0.35","墓深":"0.4","length":1.7,"width":0.35,"depth":0.4,"发掘位置":"土城镇西北2.5公里白桦沟北沟掌","层位":"","备注":"墓区面积约36000平方米。石棺用石板块竖砌，棺底用不规则形石块平铺，上部条形石板块覆盖。单人葬。清理1座：棺内长1.55、宽0.31、深0.35米。随葬红陶钵（内装狗头骨）、贝币、骨珠、铜耳环、陶纺轮。","器物":["红陶钵（陶器）","铜耳环（青铜器）","贝币（货币）","骨珠（骨角牙器 / 串珠）","陶纺轮（陶器）"],"artifacts":[{"器物编号":"牛圈子梁-1","器物名称":"红陶钵","材质":"陶器","器型":"钵","数量":"1","特征描述":"内装1狗头骨"},{"器物编号":"牛圈子梁-2","器物名称":"铜耳环","材质":"青铜器","器型":"耳环","数量":"1","特征描述":"残，出于头部东侧"},{"器物编号":"牛圈子梁-3","器物名称":"贝币","材质":"货币","器型":"贝币","数量":"1","特征描述":"零星，出于胸部周围"},{"器物编号":"牛圈子梁-4","器物名称":"骨珠","材质":"骨角牙器","器型":"串珠","数量":"1","特征描述":"出于胸部周围"},{"器物编号":"牛圈子梁-5","器物名称":"陶纺轮","材质":"陶器","器型":"纺轮","数量":"1","特征描述":"出于小腿部填土中"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 1.7m 推断","墓口宽按形制默认值 0.35m 推断","墓深按形制默认值 0.4m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"土城镇西北2.5公里白桦沟北沟掌","site_position":{"x":26.7,"z":106.2,"group":"土城镇西北2.5公里白桦沟北沟掌","method":"同发掘位置分组网格推断"}},{"id":"献县M36","name":"土坑木椁墓（带墓道、侧室、主室）","source":"hebei-1.csv","年代":"汉代","墓向":"2°","墓葬形制":"土坑木椁墓（带墓道、侧室、主室）","墓口长":"14.4","墓口宽":"13.8","墓深":"5.2","length":14.4,"width":13.8,"depth":5.2,"发掘位置":"献县万村乡陵上寺村","层位":"封土下6米处开口","备注":"河间国王墓级别大型墓。墓道东西总长五十余米（清理46.3米），宽8-9米。主室墓圹东西14.4、南北13.8、深5.20米。木椁7层盖板。小侧室出土18件釉陶壶。被盗严重。","器物":["釉陶壶（陶器）×18","铜钱（货币 / 钱币）"],"artifacts":[{"器物编号":"M36:侧室壶","器物名称":"釉陶壶","材质":"陶器","器型":"壶","数量":"18","特征描述":"出土于小侧室"},{"器物编号":"M36:铜钱","器物名称":"铜钱","材质":"货币","器型":"钱币","数量":"1","特征描述":"若干"}],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.88,"model_confidence_label":"高","location_group":"献县万村乡陵上寺村","site_position":{"x":-25.5,"z":124.2,"group":"献县万村乡陵上寺村","method":"同发掘位置分组网格推断"}},{"id":"石北口M1","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"194°","墓葬形制":"长方形竖穴土坑墓","墓口长":"1.9","墓口宽":"0.6","墓深":"0.5","length":1.9,"width":0.6,"depth":0.5,"发掘位置":"B区T41","层位":"开口于第①层下，打破②层","备注":"甲类墓。成年女性，仰身直肢。骨架上以缸片覆盖。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"B区T41","site_position":{"x":13.8,"z":58.8,"group":"B区T41","method":"发掘位置T号推断"}},{"id":"石北口M2","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"190°","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"1.75","墓口宽":"0.71","墓深":"0.38","length":1.75,"width":0.71,"depth":0.38,"发掘位置":"B区T47","层位":"开口于第①层下，打破H54","备注":"甲类墓。成年二次葬，性别不详。以瓮、缸残片覆盖。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"B区T47","site_position":{"x":39.0,"z":58.8,"group":"B区T47","method":"发掘位置T号推断"}},{"id":"石北口M3","name":"长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"","墓葬形制":"长方形竖穴土坑墓","墓口长":"3.4","墓口宽":"1.5","墓深":"2","length":3.4,"width":1.5,"depth":2.0,"发掘位置":"B区","层位":"","备注":"甲类墓。骨架上以瓮片覆盖。报告中未提供详细尺寸。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3.4m 推断","墓口宽按形制默认值 1.5m 推断","墓深按形制默认值 2m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"B区","site_position":{"x":-25.5,"z":54,"group":"B区","method":"同发掘位置分组网格推断"}},{"id":"石北口M4","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"190°","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"1.7","墓口宽":"0.4","墓深":"0.7","length":1.7,"width":0.4,"depth":0.7,"发掘位置":"B区T40","层位":"开口于第①层下，打破②层和H50","备注":"乙类墓。成年男性，仰身直肢。无随葬品。","器物":[],"artifacts":[],"model_tier":"full","dimension_sources":{"墓口长":"recorded","墓口宽":"recorded","墓深":"recorded"},"dimension_notes":[],"model_confidence":0.76,"model_confidence_label":"中","location_group":"B区T40","site_position":{"x":-5.4,"z":58.8,"group":"B区T40","method":"发掘位置T号推断"}},{"id":"石北口M5","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"A/B区","层位":"","备注":"乙类墓。报告中未提供详细描述。无随葬品。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"A/B区","site_position":{"x":-43.5,"z":18,"group":"A/B区","method":"同发掘位置分组网格推断"}},{"id":"石北口M6","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"A/B区","层位":"","备注":"乙类墓。报告中未提供详细描述。无随葬品。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"A/B区","site_position":{"x":-38.5,"z":18,"group":"A/B区","method":"同发掘位置分组网格推断"}},{"id":"石北口M7","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"A/B区","层位":"","备注":"乙类墓。报告中未提供详细描述。无随葬品。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"A/B区","site_position":{"x":-33.5,"z":18,"group":"A/B区","method":"同发掘位置分组网格推断"}},{"id":"石北口M8","name":"圆角长方形竖穴土坑墓","source":"hebei-1.csv","年代":"新石器时代","墓向":"","墓葬形制":"圆角长方形竖穴土坑墓","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"A/B区","层位":"","备注":"乙类墓。报告中未提供详细描述。无随葬品。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.28,"model_confidence_label":"低","location_group":"A/B区","site_position":{"x":-28.5,"z":18,"group":"A/B区","method":"同发掘位置分组网格推断"}},{"id":"龙店M1","name":"圆形砖室墓（仿木结构）","source":"hebei-1.csv","年代":"宋代","墓向":"2°","墓葬形制":"圆形砖室墓（仿木结构）","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"武邑县龙店村北","层位":"","备注":"砖室墓，圆形穹窿顶，仿木结构建筑。火化后入葬。","器物":["铜镜（青铜器）"],"artifacts":[{"器物编号":"龙店M1:镜","器物名称":"铜镜","材质":"青铜器","器型":"镜","数量":"1","特征描述":"背面素面。直径10厘米"}],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.36,"model_confidence_label":"低","location_group":"武邑县龙店村北","site_position":{"x":-25.5,"z":16.2,"group":"武邑县龙店村北","method":"同发掘位置分组网格推断"}},{"id":"龙店M2","name":"圆形砖室墓（仿木结构）","source":"hebei-1.csv","年代":"宋代","墓向":"2°","墓葬形制":"圆形砖室墓（仿木结构）","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"武邑县龙店村北","层位":"","备注":"砖室墓，形制同一号墓。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"武邑县龙店村北","site_position":{"x":-20.5,"z":16.2,"group":"武邑县龙店村北","method":"同发掘位置分组网格推断"}},{"id":"龙店M3","name":"圆形砖室墓（仿木结构）","source":"hebei-1.csv","年代":"宋代","墓向":"2°","墓葬形制":"圆形砖室墓（仿木结构）","墓口长":"3","墓口宽":"3","墓深":"2.7","length":3.0,"width":3.0,"depth":2.7,"发掘位置":"武邑县龙店村北","层位":"","备注":"砖室墓，形制同一号墓。","器物":[],"artifacts":[],"model_tier":"schematic","dimension_sources":{"墓口长":"inferred","墓口宽":"inferred","墓深":"inferred"},"dimension_notes":["墓口长按形制默认值 3m 推断","墓口宽按形制默认值 3m 推断","墓深按形制默认值 2.7m 推断"],"model_confidence":0.32,"model_confidence_label":"低","location_group":"武邑县龙店村北","site_position":{"x":-15.5,"z":16.2,"group":"武邑县龙店村北","method":"同发掘位置分组网格推断"}}];
+const ERA_COLORS = {"新石器时代":"#6b7280","夏":"#78716c","商":"#78716c","周":"#0e7490","春秋":"#0e7490","战国":"#0e7490","秦":"#dc2626","汉":"#b45309","三国":"#475569","晋":"#7c3aed","南北朝":"#0369a1","隋":"#9333ea","唐":"#15803d","宋":"#7c3aed","辽":"#059669","金":"#059669","元":"#be185d","明":"#dc2626","清":"#ca8a04"};
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x121316);
+scene.fog = new THREE.Fog(0x121316, 45, 160);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.88;
+
+scene.add(new THREE.AmbientLight(0x56504a, 0.9));
+const keyLight = new THREE.DirectionalLight(0xffe5bd, 1.25);
+keyLight.position.set(18, 24, 14);
+keyLight.castShadow = true;
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x8ca6ff, 0.35);
+fillLight.position.set(-16, 9, -14);
+scene.add(fillLight);
+
+const grid = new THREE.GridHelper(80, 40, 0x555144, 0x2d2e2a);
+scene.add(grid);
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({ color:0x181a17, roughness:1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const tombGroup = new THREE.Group();
+scene.add(tombGroup);
+let currentBuildGroup = tombGroup;
+let labelsVisible = false;
+let viewMode = 'site';
+let activeIndex = 0;
+let visibleIndexes = tombs.map((_, i) => i);
+let activeEra = '全部';
+let clipActive = false;
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const selectionRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.15, 1.35, 48),
+  new THREE.MeshBasicMaterial({ color:0xf4d58b, transparent:true, opacity:0.9, side:THREE.DoubleSide })
+);
+selectionRing.rotation.x = -Math.PI / 2;
+selectionRing.position.y = 0.035;
+selectionRing.visible = false;
+scene.add(selectionRing);
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+function num(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (!value) return null;
+  const text = String(value).replace(/[米ｍm]/g, '').replace(/[－—]/g, '-').replace(/～/g, '~');
+  const match = text.match(/(\d+(?:\.\d+)?)(?:\s*[-~]\s*(\d+(?:\.\d+)?))?/);
+  if (!match) return null;
+  const first = Number(match[1]);
+  const second = match[2] ? Number(match[2]) : null;
+  return second ? (first + second) / 2 : first;
+}
+
+function eraKey(era) {
+  const text = String(era || '');
+  return Object.keys(ERA_COLORS).find((key) => text.includes(key)) || '未知';
+}
+
+function colorFor(tomb) {
+  const color = ERA_COLORS[eraKey(tomb.年代)] || '#8d8b83';
+  return Number.parseInt(color.slice(1), 16);
+}
+
+function hexColor(color) {
+  return '#' + color.toString(16).padStart(6, '0');
+}
+
+function dimsFor(tomb) {
+  const shape = `${tomb.墓葬形制 || tomb.name || ''}${tomb.备注 || ''}`;
+  let length = num(tomb.length) ?? num(tomb.墓口长);
+  let width = num(tomb.width) ?? num(tomb.墓口宽);
+  let depth = num(tomb.depth) ?? num(tomb.墓深);
+
+  if (!length || !width || !depth) {
+    if (/石棺/.test(shape)) { length ||= 1.7; width ||= 0.35; depth ||= 0.4; }
+    else if (/圆|六角|八角/.test(shape)) { length ||= 3; width ||= length; depth ||= 2.7; }
+    else if (/竖穴|土坑/.test(shape)) { length ||= 3.4; width ||= 1.5; depth ||= 2; }
+    else if (/多室/.test(shape)) { length ||= 12; width ||= 6; depth ||= 3; }
+    else { length ||= 3; width ||= 2; depth ||= 2; }
+  }
+  const maxDim = Math.max(length, width, depth);
+  const scale = maxDim > 30 ? 0.22 : maxDim > 12 ? 0.38 : 1;
+  return { length, width, depth, scale };
+}
+
+function wallMat(color, opacity=0.55) {
+  return new THREE.MeshStandardMaterial({
+    color, transparent:true, opacity, roughness:0.72, side:THREE.DoubleSide, depthWrite:false
+  });
+}
+function solidMat(color) {
+  return new THREE.MeshStandardMaterial({ color, roughness:0.62 });
+}
+function floorMat(color=0x4a3a2a) {
+  return new THREE.MeshStandardMaterial({ color, roughness:0.92 });
+}
+function roofMat(color, opacity=0.38) {
+  return new THREE.MeshStandardMaterial({
+    color, transparent:true, opacity, roughness:0.65, side:THREE.DoubleSide, depthWrite:false
+  });
+}
+
+function clearTomb() {
+  while (tombGroup.children.length) {
+    const child = tombGroup.children[0];
+    child.traverse((node) => {
+      if (node.geometry) node.geometry.dispose();
+      if (node.material) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach((mat) => mat.dispose && mat.dispose());
+      }
+    });
+    tombGroup.remove(child);
+  }
+}
+
+function addMesh(mesh, x=0, y=0, z=0) {
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  currentBuildGroup.add(mesh);
+  return mesh;
+}
+
+function addLabel(text, position, color=0xffffff) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 112;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(15,16,15,0.78)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+  ctx.fillStyle = hexColor(color);
+  ctx.font = '600 32px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(text).slice(0, 24), 256, 56);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:texture, transparent:true }));
+  sprite.position.copy(position);
+  sprite.scale.set(4.8, 1.05, 1);
+  sprite.userData.isLabel = true;
+  sprite.visible = labelsVisible;
+  currentBuildGroup.add(sprite);
+}
+
+function addDoorFrame(width, height, z, color=0x6b4226) {
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.1), solidMat(color)), 0, height / 2, z);
+  for (const x of [-width * 0.4, width * 0.4]) {
+    addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, height, 10), solidMat(color)), x, height / 2, z - 0.02);
+  }
+  for (const x of [-width * 0.28, 0, width * 0.28]) {
+    addMesh(new THREE.Mesh(new THREE.BoxGeometry(width * 0.18, 0.12, 0.14), solidMat(0x8b5a2b)), x, height + 0.12, z - 0.02);
+  }
+}
+
+function addRoomBox(label, x, z, w, d, h, color, opacity=0.48) {
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), floorMat(0x403326)), x, 0.06, z);
+  const wallT = Math.max(0.08, Math.min(w, d) * 0.04);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), wallMat(color, opacity)), x, h / 2, z - d / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), wallMat(color, opacity)), x, h / 2, z + d / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), wallMat(color, opacity)), x - w / 2, h / 2, z);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), wallMat(color, opacity)), x + w / 2, h / 2, z);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(w * 0.48, 0.18, d * 0.32), floorMat(0x5a4a3a)), x, 0.2, z);
+  addLabel(label, new THREE.Vector3(x, h + 0.75, z), 0xaaa28f);
+}
+
+function addVesselCluster(tomb, centerX, centerZ, color=0x8b7355) {
+  const count = Math.min(12, Math.max(3, (tomb.artifacts || tomb.器物 || []).length));
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const radius = 0.28 + (i % 3) * 0.12;
+    const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.085, 0.22, 10), solidMat(color));
+    addMesh(jar, centerX + Math.cos(angle) * radius, 0.18, centerZ + Math.sin(angle) * radius);
+  }
+}
+
+function buildRectangular(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  const wallT = Math.max(0.08, Math.min(L, W) * 0.035);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, W), floorMat()), 0, 0.06, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, wallT), wallMat(color)), 0, H / 2, -W / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, wallT), wallMat(color)), 0, H / 2, W / 2);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, H, W), wallMat(color)), -L / 2, H / 2, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(wallT, H, W), wallMat(color)), L / 2, H / 2, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.14, W), roofMat(color)), 0, H + 0.07, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 0.55, 0.2, W * 0.36), floorMat(0x5a4a3a)), 0, 0.2, 0);
+  addLabel(tomb.墓葬形制 || tomb.name || tomb.id, new THREE.Vector3(0, H + 1.25, 0), color);
+}
+
+function buildCircular(tomb, segments=32) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const radius = Math.max(length, width) * scale / 2;
+  const H = depth * scale;
+  addMesh(new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.18, radius + 0.25, 0.18, segments), floorMat()), 0, 0.09, 0);
+  addMesh(new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, H, segments, 1, true), wallMat(color)), 0, H / 2 + 0.18, 0);
+  addMesh(new THREE.Mesh(new THREE.SphereGeometry(radius, segments, 12, 0, Math.PI * 2, 0, Math.PI / 2), roofMat(color)), 0, H + 0.18, 0);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(radius, segments), floorMat(0x3a3a3a));
+  floor.rotation.x = -Math.PI / 2;
+  addMesh(floor, 0, 0.2, 0);
+  addMesh(new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.58, radius * 0.58, 0.22, segments), floorMat(0x5a4a3a)), 0, 0.32, 0);
+  if (/仿木|门楼|斗栱/.test(`${tomb.墓葬形制 || ''}${tomb.备注 || ''}`)) addDoorFrame(radius * 0.65, Math.min(H * 0.75, 2), -radius + 0.08);
+  addLabel(tomb.墓葬形制 || tomb.name || tomb.id, new THREE.Vector3(0, H + radius + 0.9, 0), color);
+}
+
+function buildPyramidRoof(tomb) {
+  buildRectangular(tomb);
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const S = Math.max(length, width) * scale;
+  const H = depth * scale;
+  addMesh(new THREE.Mesh(new THREE.ConeGeometry(S * 0.6, Math.max(0.9, S * 0.45), 4), roofMat(color)), 0, H + Math.max(0.55, S * 0.23), 0).rotation.y = Math.PI / 4;
+}
+
+function buildMultiChamber(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  const roomH = Math.max(0.9, H * 0.82);
+  const passageLen = Math.max(2.2, L * 0.26);
+  const chamberLen = Math.max(1.2, (L - passageLen * 0.45) / 3);
+  const chamberW = Math.max(1.6, W * 0.62);
+  const frontX = -chamberLen;
+  const midX = 0;
+  const rearX = chamberLen;
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L + passageLen, 0.08, W * 1.08), floorMat(0x34291f)), -passageLen * 0.18, 0.04, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passageLen, roomH * 0.58, W * 0.32), wallMat(color, 0.28)), -L / 2 - passageLen / 2, roomH * 0.29, 0);
+  addLabel('墓道', new THREE.Vector3(-L / 2 - passageLen / 2, roomH + 0.45, 0), 0xaaa28f);
+
+  addRoomBox('前室', frontX, 0, chamberLen * 0.92, chamberW, roomH, color, 0.52);
+  addRoomBox('中室', midX, 0, chamberLen * 0.86, chamberW, roomH, color, 0.52);
+  addRoomBox('后室', rearX, 0, chamberLen * 0.9, chamberW, roomH, color, 0.52);
+
+  for (const x of [frontX, midX]) {
+    for (const side of [-1, 1]) {
+      addRoomBox('耳室', x, side * W * 0.42, chamberLen * 0.42, W * 0.23, roomH * 0.62, color, 0.38);
+    }
+  }
+
+  if (/龛|壁龛/.test(`${tomb.墓葬形制 || ''}${tomb.备注 || ''}`)) {
+    addMesh(new THREE.Mesh(new THREE.BoxGeometry(chamberLen * 0.28, roomH * 0.52, W * 0.18), solidMat(0x3a2a1a)), rearX + chamberLen * 0.38, roomH * 0.28, 0);
+    addLabel('壁龛', new THREE.Vector3(rearX + chamberLen * 0.38, roomH * 0.9, 0), 0xaaa28f);
+  }
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, W * 0.78), roofMat(color, 0.3)), 0, roomH + 0.08, 0);
+  addVesselCluster(tomb, midX, -W * 0.16);
+  addLabel(tomb.墓葬形制 || '多室墓', new THREE.Vector3(0, roomH + 1.45, 0), color);
+}
+
+function buildFrontRearChamber(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  const roomH = Math.max(0.9, H * 0.82);
+  const frontW = Math.max(1.5, L * 0.34);
+  const rearW = Math.max(1.5, L * 0.36);
+  const roomD = Math.max(1.2, W * 0.88);
+  const gap = Math.max(0.25, L * 0.06);
+  const frontX = -(rearW + gap) / 2;
+  const rearX = (frontW + gap) / 2;
+  const passLen = Math.max(2, L * 0.35);
+
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(frontW + rearW + gap + passLen * 0.7, 0.08, roomD * 1.1), floorMat(0x34291f)), -passLen * 0.18, 0.04, 0);
+  addRoomBox('前室', frontX, 0, frontW, roomD * 0.94, roomH, color, 0.52);
+  addRoomBox('后室', rearX, 0, rearW, roomD, roomH, color, 0.52);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, roomH * 0.52, roomD * 0.32), wallMat(color, 0.28)), frontX - frontW / 2 - passLen / 2, roomH * 0.26, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(frontW + rearW + gap, 0.14, roomD), roofMat(color, 0.32)), gap / 2, roomH + 0.07, 0);
+  addVesselCluster(tomb, rearX, -roomD * 0.2, 0x8b7355);
+  addLabel('墓道', new THREE.Vector3(frontX - frontW / 2 - passLen / 2, roomH + 0.45, 0), 0xaaa28f);
+  addLabel(tomb.墓葬形制 || '前后室墓', new THREE.Vector3(gap / 2, roomH + 1.35, 0), color);
+}
+
+function buildShaft(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 1.15, H * 1.15, W * 1.22), wallMat(color, 0.25)), 0, H * 0.58, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H * 0.75, W), wallMat(color, 0.55)), 0, H * 0.38, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 0.78, 0.18, W * 0.58), floorMat(0x5a4a3a)), 0, 0.22, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 1.04, 0.12, W * 1.04), roofMat(color, 0.45)), 0, H * 0.78, 0);
+  addLabel(tomb.墓葬形制 || '竖穴墓', new THREE.Vector3(0, H + 0.9, 0), color);
+}
+
+function buildStoneCoffin(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, H, W), wallMat(color, 0.65)), 0, H / 2, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 0.93, H * 0.7, W * 0.78), solidMat(0x242421)), 0, H * 0.52, 0);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L * 1.05, Math.max(0.05, H * 0.12), W * 1.08), roofMat(color, 0.55)), 0, H * 1.06, 0);
+  addMesh(new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.05, W * 0.16), 10, 8), solidMat(0xd4c5a9)), L * 0.28, H * 0.48, 0);
+  addLabel(tomb.墓葬形制 || '石棺墓', new THREE.Vector3(0, H + 0.7, 0), color);
+}
+
+function buildWoodChamber(tomb) {
+  const color = colorFor(tomb);
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const L = length * scale, W = width * scale, H = depth * scale;
+  const pitH = Math.max(1.2, H * 0.92);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, W), floorMat(0x2d2118)), 0, 0.06, 0);
+  for (const z of [-W / 2, W / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(L, pitH, 0.14), wallMat(color, 0.28)), 0, pitH / 2, z);
+  for (const x of [-L / 2, L / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.14, pitH, W), wallMat(color, 0.28)), x, pitH / 2, 0);
+
+  const cL = L * 0.68, cW = W * 0.62, cH = pitH * 0.52;
+  for (const z of [-cW / 2, cW / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(cL, cH, 0.1), solidMat(0x8b6914)), 0, cH / 2, z);
+  for (const x of [-cL / 2, cL / 2]) addMesh(new THREE.Mesh(new THREE.BoxGeometry(0.1, cH, cW), solidMat(0x8b6914)), x, cH / 2, 0);
+  for (let i = 0; i < 7; i++) {
+    addMesh(new THREE.Mesh(new THREE.BoxGeometry(cL + 0.08 + i * 0.03, 0.045, cW + 0.08 + i * 0.03), solidMat(0x8b6914)), 0, cH + i * 0.07, 0);
+  }
+
+  const passLen = Math.max(3, L * 0.95);
+  addMesh(new THREE.Mesh(new THREE.BoxGeometry(passLen, pitH * 0.48, W * 0.34), wallMat(color, 0.22)), -L / 2 - passLen / 2, pitH * 0.24, 0);
+  addLabel('墓道', new THREE.Vector3(-L / 2 - passLen / 2, pitH + 0.45, 0), 0xaaa28f);
+
+  if (/侧室|小侧室/.test(`${tomb.墓葬形制 || ''}${tomb.备注 || ''}`)) {
+    const sideX = L / 2 + Math.max(0.8, L * 0.13);
+    addRoomBox('侧室', sideX, 0, Math.max(1.2, L * 0.22), Math.max(1.1, W * 0.36), pitH * 0.52, color, 0.36);
+    addVesselCluster(tomb, sideX, 0, 0x8b7355);
+  } else {
+    addVesselCluster(tomb, 0, -cW * 0.25, 0x8b7355);
+  }
+  addLabel('主椁室', new THREE.Vector3(0, cH + 0.75, 0), 0xaaa28f);
+  addLabel(tomb.墓葬形制 || '木椁墓', new THREE.Vector3(0, pitH + 1.15, 0), color);
+}
+
+function buildTomb(tomb) {
+  const shape = `${tomb.墓葬形制 || tomb.name || ''}${tomb.备注 || ''}`;
+  if (/石棺|石板/.test(shape)) buildStoneCoffin(tomb);
+  else if (/木椁|木槨/.test(shape)) buildWoodChamber(tomb);
+  else if (/前后室/.test(shape)) buildFrontRearChamber(tomb);
+  else if (/多室|前室|中室|后室|耳室/.test(shape)) buildMultiChamber(tomb);
+  else if (/竖穴|土坑|砖圹|壁龛/.test(shape)) buildShaft(tomb);
+  else if (/六角|六边/.test(shape)) buildCircular(tomb, 6);
+  else if (/八角|八边/.test(shape)) buildCircular(tomb, 8);
+  else if (/圆/.test(shape)) buildCircular(tomb, 32);
+  else if (/攒尖|方形/.test(shape)) buildPyramidRoof(tomb);
+  else buildRectangular(tomb);
+}
+
+function buildTombAt(tomb, index, options={}) {
+  const root = new THREE.Group();
+  root.userData.tombIndex = index;
+  root.userData.tombId = tomb.id;
+  currentBuildGroup = root;
+  buildTomb(tomb);
+  currentBuildGroup = tombGroup;
+
+  const pos = tomb.site_position || { x:0, z:0 };
+  root.position.set(options.single ? 0 : pos.x || 0, 0, options.single ? 0 : pos.z || 0);
+  if (!options.single) root.scale.setScalar(0.62);
+  root.traverse((obj) => {
+    obj.userData.tombIndex = index;
+    if (obj.userData.isLabel) obj.visible = labelsVisible;
+  });
+  tombGroup.add(root);
+  return root;
+}
+
+function selectedPosition() {
+  const tomb = tombs[activeIndex];
+  if (!tomb || viewMode === 'single') return new THREE.Vector3(0, 0.04, 0);
+  const pos = tomb.site_position || { x:0, z:0 };
+  return new THREE.Vector3(pos.x || 0, 0.04, pos.z || 0);
+}
+
+function updateSelectionRing() {
+  if (viewMode === 'single' || !tombs[activeIndex]) {
+    selectionRing.visible = false;
+    return;
+  }
+  selectionRing.visible = true;
+  selectionRing.position.copy(selectedPosition());
+  const { length, width, scale } = dimsFor(tombs[activeIndex]);
+  const radius = Math.max(1.2, Math.max(length, width) * scale * 0.42);
+  selectionRing.scale.setScalar(radius);
+}
+
+function renderScene() {
+  clearTomb();
+  if (viewMode === 'single') {
+    buildTombAt(tombs[activeIndex], activeIndex, { single:true });
+  } else {
+    visibleIndexes.forEach((index) => buildTombAt(tombs[index], index));
+  }
+  applyClipping();
+  updateSelectionRing();
+}
+
+function applyClipping() {
+  renderer.localClippingEnabled = clipActive;
+  tombGroup.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach((mat) => { mat.clippingPlanes = clipActive ? [clipPlane] : []; });
+  });
+}
+
+function showTomb(index) {
+  activeIndex = index;
+  const tomb = tombs[index];
+  renderScene();
+  renderList();
+  renderInfo(tomb);
+  fitCamera();
+}
+
+function fitSingleCamera(tomb) {
+  const { length, width, depth, scale } = dimsFor(tomb);
+  const maxDim = Math.max(length * scale, width * scale, depth * scale, 3);
+  camera.position.set(maxDim * 1.45, maxDim * 0.85, maxDim * 1.45);
+  controls.target.set(0, Math.max(0.7, depth * scale * 0.35), 0);
+  controls.update();
+}
+
+function fitSceneCamera(topDown=false) {
+  const box = new THREE.Box3().setFromObject(tombGroup);
+  if (box.isEmpty()) {
+    camera.position.set(16, 12, 16);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    return;
+  }
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxDim = Math.max(size.x, size.z, 8);
+  if (topDown) {
+    camera.position.set(center.x, Math.max(18, maxDim * 1.35), center.z + 0.01);
+  } else {
+    camera.position.set(center.x + maxDim * 0.78, Math.max(12, maxDim * 0.58), center.z + maxDim * 0.86);
+  }
+  controls.target.set(center.x, Math.max(0.8, center.y * 0.45), center.z);
+  controls.update();
+}
+
+function fitCamera() {
+  if (viewMode === 'single') fitSingleCamera(tombs[activeIndex]);
+  else fitSceneCamera(viewMode === 'top');
+}
+
+function renderInfo(tomb) {
+  const panel = document.getElementById('info-panel');
+  const dims = [
+    ['墓口长', tomb.墓口长 || tomb.length],
+    ['墓口宽', tomb.墓口宽 || tomb.width],
+    ['墓深', tomb.墓深 || tomb.depth],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+  const dimensionSources = tomb.dimension_sources || {};
+  const dimensionNotes = tomb.dimension_notes || [];
+  const sourceHtml = Object.entries(dimensionSources).map(([label, source]) => {
+    const text = source === 'recorded' ? '原始记录' : '推断';
+    return `<span>${escapeHtml(label)}：${text}</span>`;
+  }).join(' · ');
+  panel.innerHTML = `
+    <div>
+      <h2>${escapeHtml(tomb.id)} <span class="muted">${escapeHtml(tomb.年代 || '')}</span></h2>
+      <div class="muted">${escapeHtml(tomb.墓葬形制 || tomb.name || '形制未标注')}</div>
+      <div class="muted">${escapeHtml(tomb.墓向 || '')}${tomb.墓向 && tomb.发掘位置 ? ' · ' : ''}${escapeHtml(tomb.发掘位置 || '')}</div>
+      <div class="dim-grid">
+        ${dims.map(([label, value]) => `<div class="dim"><strong>${escapeHtml(value)}m</strong><span>${label}</span></div>`).join('')}
+        <div class="dim"><strong>${escapeHtml(tomb.model_tier || 'schematic')}</strong><span>建模层级</span></div>
+        <div class="dim"><strong>${escapeHtml(tomb.model_confidence_label || '低')}</strong><span>置信度 ${escapeHtml(tomb.model_confidence ?? '')}</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="desc">${escapeHtml(tomb.备注 || '暂无结构描述；模型按形制关键词和默认尺寸示意生成。')}</p>
+      ${sourceHtml ? `<div class="artifact-line">尺寸来源：${sourceHtml}</div>` : ''}
+      ${dimensionNotes.length ? `<div class="artifact-line">推断说明：${escapeHtml(dimensionNotes.join('；'))}</div>` : ''}
+      ${tomb.site_position ? `<div class="artifact-line">并列位置：${escapeHtml(tomb.site_position.group)}；${escapeHtml(tomb.site_position.method)}</div>` : ''}
+      ${tomb.器物?.length ? `<div class="artifact-line">出土器物：${escapeHtml(tomb.器物.slice(0, 28).join('、'))}${tomb.器物.length > 28 ? ' 等' : ''}</div>` : ''}
+    </div>
+  `;
+}
+
+function filteredIndexes() {
+  const query = document.getElementById('search').value.trim().toLowerCase();
+  return tombs.map((tomb, index) => ({ tomb, index })).filter(({ tomb }) => {
+    const eraMatches = activeEra === '全部' || eraKey(tomb.年代) === activeEra;
+    if (!eraMatches) return false;
+    if (!query) return true;
+    const haystack = [
+      tomb.id, tomb.name, tomb.年代, tomb.墓向, tomb.墓葬形制, tomb.发掘位置, tomb.备注,
+      ...(tomb.器物 || [])
+    ].join(' ').toLowerCase();
+    return haystack.includes(query);
+  }).map(({ index }) => index);
+}
+
+function renderList() {
+  const list = document.getElementById('tomb-list');
+  visibleIndexes = filteredIndexes();
+  document.getElementById('stat-visible').textContent = visibleIndexes.length;
+  if (!visibleIndexes.length) {
+    list.innerHTML = '<div class="empty">没有匹配的墓葬记录。</div>';
+    return;
+  }
+  list.innerHTML = visibleIndexes.map((index) => {
+    const tomb = tombs[index];
+    const color = hexColor(colorFor(tomb));
+    const dim = tomb.墓口长 || tomb.墓口宽 || tomb.墓深
+      ? `${escapeHtml(tomb.墓口长 || '?')}×${escapeHtml(tomb.墓口宽 || '?')}×${escapeHtml(tomb.墓深 || '?')}m`
+      : '尺寸待考';
+    return `
+      <button class="tomb-item ${index === activeIndex ? 'is-active' : ''}" type="button" data-index="${index}">
+        <span class="tomb-title">${escapeHtml(tomb.id)}</span>
+        <span class="tomb-meta">${escapeHtml(tomb.墓葬形制 || tomb.name || '')}</span>
+        <span class="tomb-meta">${dim} · ${escapeHtml(tomb.发掘位置 || tomb.source || '')}</span>
+        <span class="badge" style="background:${color}cc">${escapeHtml(tomb.年代 || '未知')}</span>
+      </button>
+    `;
+  }).join('');
+  list.querySelectorAll('.tomb-item').forEach((item) => {
+    item.addEventListener('click', () => showTomb(Number(item.dataset.index)));
+  });
+}
+
+function renderEraFilters() {
+  const eras = ['全部', ...Array.from(new Set(tombs.map((t) => eraKey(t.年代)))).filter(Boolean).sort()];
+  const wrap = document.getElementById('era-filters');
+  wrap.innerHTML = eras.map((era) => `<button class="chip ${era === activeEra ? 'is-active' : ''}" type="button" data-era="${escapeHtml(era)}">${escapeHtml(era)}</button>`).join('');
+  wrap.querySelectorAll('.chip').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeEra = button.dataset.era;
+      renderEraFilters();
+      renderList();
+      if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) {
+        showTomb(visibleIndexes[0]);
+      } else {
+        renderScene();
+        fitCamera();
+      }
+    });
+  });
+}
+
+function resize() {
+  const rect = container.getBoundingClientRect();
+  camera.aspect = Math.max(rect.width, 1) / Math.max(rect.height, 1);
+  camera.updateProjectionMatrix();
+  renderer.setSize(Math.max(rect.width, 1), Math.max(rect.height, 1));
+}
+
+document.getElementById('search').addEventListener('input', () => {
+  renderList();
+  if (!visibleIndexes.includes(activeIndex) && visibleIndexes.length) {
+    showTomb(visibleIndexes[0]);
+  } else {
+    renderScene();
+    fitCamera();
+  }
+});
+document.getElementById('fit-btn').addEventListener('click', () => fitCamera());
+document.getElementById('site-btn').addEventListener('click', () => {
+  viewMode = 'site';
+  document.getElementById('site-btn').classList.add('is-active');
+  document.getElementById('single-btn').classList.remove('is-active');
+  document.getElementById('top-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
+document.getElementById('single-btn').addEventListener('click', () => {
+  viewMode = 'single';
+  document.getElementById('single-btn').classList.add('is-active');
+  document.getElementById('site-btn').classList.remove('is-active');
+  document.getElementById('top-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
+document.getElementById('top-btn').addEventListener('click', () => {
+  viewMode = 'top';
+  document.getElementById('top-btn').classList.add('is-active');
+  document.getElementById('site-btn').classList.remove('is-active');
+  document.getElementById('single-btn').classList.remove('is-active');
+  renderScene();
+  fitCamera();
+});
+document.getElementById('clip-btn').addEventListener('click', (event) => {
+  clipActive = !clipActive;
+  event.currentTarget.classList.toggle('is-active', clipActive);
+  applyClipping();
+});
+document.getElementById('label-btn').addEventListener('click', (event) => {
+  labelsVisible = !labelsVisible;
+  event.currentTarget.classList.toggle('is-active', labelsVisible);
+  tombGroup.traverse((obj) => { if (obj.userData.isLabel) obj.visible = labelsVisible; });
+});
+
+container.addEventListener('pointerdown', (event) => {
+  if (viewMode === 'single') return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(tombGroup.children, true);
+  const hit = hits.find((item) => Number.isInteger(item.object.userData.tombIndex));
+  if (hit) {
+    activeIndex = hit.object.userData.tombIndex;
+    renderList();
+    renderInfo(tombs[activeIndex]);
+    updateSelectionRing();
+  }
+});
+
+function safeFilename(value, suffix) {
+  const stem = String(value || 'tomb-model').replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 80) || 'tomb-model';
+  return `${stem}.${suffix}`;
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadText(filename, text, type='text/plain;charset=utf-8') {
+  downloadBlob(filename, new Blob([text], { type }));
+}
+
+function exportGLB() {
+  const exporter = new GLTFExporter();
+  const exportRoot = tombGroup.clone(true);
+  exportRoot.traverse((obj) => {
+    if (obj.userData?.isLabel) obj.visible = false;
+  });
+  exporter.parse(
+    exportRoot,
+    (result) => {
+      if (result instanceof ArrayBuffer) {
+        downloadBlob(safeFilename('河北墓葬3D建模', 'glb'), new Blob([result], { type:'model/gltf-binary' }));
+      } else {
+        downloadText(safeFilename('河北墓葬3D建模', 'gltf'), JSON.stringify(result, null, 2), 'model/gltf+json;charset=utf-8');
+      }
+    },
+    (error) => {
+      console.error(error);
+      alert('GLB导出失败，请查看浏览器控制台。');
+    },
+    { binary:true, onlyVisible:true }
+  );
+}
+
+function blenderScript() {
+  const exportTombs = (viewMode === 'single' ? [activeIndex] : visibleIndexes).map((index) => tombs[index]);
+  const data = JSON.stringify(exportTombs, null, 2);
+  return `import bpy
+import math
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+
+tombs = ${data}
+
+def mat(name, color):
+    material = bpy.data.materials.new(name)
+    material.diffuse_color = color
+    return material
+
+wall = mat('semi_transparent_wall', (0.55, 0.43, 0.30, 0.45))
+floor = mat('floor_and_coffin_bed', (0.30, 0.23, 0.16, 1.0))
+wood = mat('wood_chamber', (0.48, 0.32, 0.12, 1.0))
+
+def cube(name, loc, scale, material):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = scale
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.data.materials.append(material)
+    return obj
+
+def build_tomb(t):
+    pos = t.get('site_position') or {'x': 0, 'z': 0}
+    length = float(t.get('length') or 3)
+    width = float(t.get('width') or 2)
+    depth = float(t.get('depth') or 2)
+    scale = 0.35 if max(length, width, depth) > 12 else 1.0
+    x = float(pos.get('x') or 0)
+    z = float(pos.get('z') or 0)
+    L, W, H = length * scale, width * scale, depth * scale
+    cube(t.get('id', 'tomb') + '_floor', (x, 0.03, z), (L, 0.06, W), floor)
+    cube(t.get('id', 'tomb') + '_body', (x, H / 2, z), (L, H, W), wall)
+    if '木椁' in (t.get('墓葬形制') or ''):
+        cube(t.get('id', 'tomb') + '_wood_chamber', (x, H * 0.3, z), (L * 0.65, H * 0.5, W * 0.65), wood)
+
+for tomb in tombs:
+    build_tomb(tomb)
+
+bpy.ops.wm.save_as_mainfile(filepath='kaogu_tomb_model.blend')
+`;
+}
+
+function dxfText() {
+  const exportIndexes = viewMode === 'single' ? [activeIndex] : visibleIndexes;
+  const lines = ['0', 'SECTION', '2', 'ENTITIES'];
+  function addLine(x1, z1, x2, z2, layer='TOMBS') {
+    lines.push('0', 'LINE', '8', layer, '10', String(x1), '20', String(z1), '30', '0', '11', String(x2), '21', String(z2), '31', '0');
+  }
+  function addRect(cx, cz, w, d, layer) {
+    const x1 = cx - w / 2, x2 = cx + w / 2, z1 = cz - d / 2, z2 = cz + d / 2;
+    addLine(x1, z1, x2, z1, layer);
+    addLine(x2, z1, x2, z2, layer);
+    addLine(x2, z2, x1, z2, layer);
+    addLine(x1, z2, x1, z1, layer);
+  }
+  exportIndexes.forEach((index) => {
+    const tomb = tombs[index];
+    const pos = viewMode === 'single' ? { x:0, z:0 } : (tomb.site_position || { x:0, z:0 });
+    const { length, width, scale } = dimsFor(tomb);
+    addRect(pos.x || 0, pos.z || 0, length * scale * (viewMode === 'single' ? 1 : 0.62), width * scale * (viewMode === 'single' ? 1 : 0.62), 'TOMB_OUTLINES');
+  });
+  lines.push('0', 'ENDSEC', '0', 'EOF');
+  return lines.join('\n');
+}
+
+document.getElementById('glb-btn').addEventListener('click', exportGLB);
+document.getElementById('blender-btn').addEventListener('click', () => {
+  downloadText(safeFilename('河北墓葬3D建模', 'py'), blenderScript(), 'text/x-python;charset=utf-8');
+});
+document.getElementById('dxf-btn').addEventListener('click', () => {
+  downloadText(safeFilename('河北墓葬3D建模', 'dxf'), dxfText(), 'application/dxf;charset=utf-8');
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+document.getElementById('stat-total').textContent = tombs.length;
+document.getElementById('stat-shapes').textContent = new Set(tombs.map((t) => t.墓葬形制 || t.name || '')).size;
+renderEraFilters();
+renderList();
+if (tombs.length) showTomb(0);
+resize();
+window.addEventListener('resize', resize);
+animate();
+</script>
+</body>
+</html>
