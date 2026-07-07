@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
@@ -25,6 +26,8 @@ from typing import Any, Iterable, Sequence
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 PDF_EXTENSION = ".pdf"
 DEFAULT_FORMATS = ("md",)
+_ENGINE_CACHE: dict[tuple[str, str | None, bool], "PaddleOCREngine"] = {}
+_ENGINE_CACHE_LOCK = threading.Lock()
 
 
 @dataclass(slots=True)
@@ -63,6 +66,7 @@ def parse(
     workers: int | None = None,
     pdf_dpi: int = 180,
     enable_angle_cls: bool = True,
+    reuse_engine: bool = False,
 ) -> list[OCRDocument]:
     """Run OCR against a file or directory and return structured documents.
 
@@ -75,6 +79,7 @@ def parse(
         pdf_dpi: Rendering resolution for PDFs when local rendering is needed.
         enable_angle_cls: Enables text-line angle classification where the
             installed PaddleOCR version supports it.
+        reuse_engine: Reuse a cached PaddleOCR instance for single-worker runs.
     """
 
     paths = discover_inputs(source)
@@ -85,8 +90,16 @@ def parse(
     started = time.perf_counter()
 
     if worker_count == 1:
-        engine = PaddleOCREngine(
-            lang=lang, device=device, enable_angle_cls=enable_angle_cls
+        engine = (
+            get_cached_engine(
+                lang=lang,
+                device=device,
+                enable_angle_cls=enable_angle_cls,
+            )
+            if reuse_engine
+            else PaddleOCREngine(
+                lang=lang, device=device, enable_angle_cls=enable_angle_cls
+            )
         )
         return [
             engine.parse_path(path, pdf_dpi=pdf_dpi, started=started) for path in paths
@@ -217,6 +230,26 @@ class PaddleOCREngine:
         if self.api == "predict":
             return self._ocr.predict(input=str(path))
         return self._ocr.ocr(str(path), cls=self.enable_angle_cls)
+
+
+def get_cached_engine(
+    *,
+    lang: str = "ch",
+    device: str | None = None,
+    enable_angle_cls: bool = True,
+) -> PaddleOCREngine:
+    """Return one shared OCR engine per compatible configuration."""
+    key = (lang, device, enable_angle_cls)
+    with _ENGINE_CACHE_LOCK:
+        engine = _ENGINE_CACHE.get(key)
+        if engine is None:
+            engine = PaddleOCREngine(
+                lang=lang,
+                device=device,
+                enable_angle_cls=enable_angle_cls,
+            )
+            _ENGINE_CACHE[key] = engine
+        return engine
 
 
 def _parse_path_worker(

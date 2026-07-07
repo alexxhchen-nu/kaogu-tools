@@ -40,7 +40,12 @@ type OCRResponse = {
   data?: OCRData;
   detail?: string;
   error?: string;
+  job_id?: string;
+  status?: "queued" | "running" | "done" | "error";
+  message?: string;
 };
+
+const OCR_POLL_INTERVAL_MS = 1500;
 
 function formatStat(value: number | undefined | null) {
   return Number.isFinite(value) ? String(value) : "—";
@@ -68,6 +73,18 @@ function downloadText(content: string, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function readOcrResponse(response: Response) {
+  const payload = (await response.json().catch(() => null)) as OCRResponse | null;
+  if (!response.ok || !payload || payload.error || payload.detail) {
+    throw new Error(payload?.error || payload?.detail || `OCR 请求失败，状态码 ${response.status}`);
+  }
+  return payload;
+}
+
 export default function OCRPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -88,7 +105,7 @@ export default function OCRPage() {
 
     setIsRunning(true);
     setRunState("loading");
-    setStatus("正在上传并执行 OCR...");
+    setStatus("正在上传并提交后台 OCR 任务...");
     setResult(null);
 
     try {
@@ -99,13 +116,36 @@ export default function OCRPage() {
         method: "POST",
         body,
       });
-      const payload = (await response.json()) as OCRResponse;
+      const payload = await readOcrResponse(response);
+      let data = payload.data ?? null;
 
-      if (!response.ok || payload.error || payload.detail) {
-        throw new Error(payload.error || payload.detail || `OCR 请求失败，状态码 ${response.status}`);
+      if (payload.job_id && payload.status !== "done") {
+        setStatus(payload.message || "OCR 任务已提交，正在等待后台 worker...");
+
+        while (true) {
+          await sleep(OCR_POLL_INTERVAL_MS);
+          const jobResponse = await fetch(resolveEndpoint(`/ocr/jobs/${payload.job_id}`));
+          const jobPayload = await readOcrResponse(jobResponse);
+
+          if (jobPayload.status === "queued") {
+            setStatus(jobPayload.message || "OCR 任务排队中...");
+            continue;
+          }
+
+          if (jobPayload.status === "running") {
+            setStatus(jobPayload.message || "OCR 正在后台识别，页面可以继续保持打开。");
+            continue;
+          }
+
+          if (jobPayload.status === "done") {
+            data = jobPayload.data ?? null;
+            break;
+          }
+
+          throw new Error(jobPayload.error || jobPayload.detail || "OCR 任务失败。");
+        }
       }
 
-      const data = payload.data ?? null;
       setResult(data);
       setRunState("done");
       setStatus(
@@ -163,7 +203,7 @@ export default function OCRPage() {
 
                   <div className="ocr-file-note">
                     <FileText className="h-4 w-4" />
-                    <span>{selectedFile ? selectedFile.name : "当前同步 OCR 默认限制小文件和少页 PDF。"}</span>
+                    <span>{selectedFile ? selectedFile.name : "OCR 会提交为后台任务，长文档不会阻塞主服务。"}</span>
                   </div>
 
                   <div className="actions">
@@ -195,7 +235,7 @@ export default function OCRPage() {
                   {runState === "loading" ? (
                     <div className="tool-empty-state compact-empty-state">
                       <Loader2 className="h-5 w-5 animate-spin" />
-                      <p className="mt-3">正在等待后端 OCR 结果...</p>
+                      <p className="mt-3">后台 OCR 任务运行中...</p>
                     </div>
                   ) : null}
 

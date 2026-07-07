@@ -1,7 +1,13 @@
 import contextlib
 import io
+import shutil
 import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +22,10 @@ from .ocr import IMAGE_EXTENSIONS, PDF_EXTENSION, document_to_markdown, parse as
 
 
 settings = get_settings()
+OCR_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="kaogu-ocr")
+OCR_JOBS: dict[str, dict[str, Any]] = {}
+OCR_JOBS_LOCK = threading.Lock()
+OCR_JOB_TTL_SECONDS = 60 * 60
 
 app = FastAPI(title=settings.app_name)
 
@@ -125,6 +135,113 @@ def count_pdf_pages(path: Path) -> int:
         pdf.close()
 
 
+def public_ocr_job(job: dict[str, Any]) -> dict[str, object]:
+    response: dict[str, object] = {
+        "ok": job["status"] != "error",
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "filename": job["filename"],
+        "message": job.get("message", ""),
+        "created_at": job["created_at"],
+        "updated_at": job["updated_at"],
+    }
+    if job.get("data") is not None:
+        response["data"] = job["data"]
+    if job.get("error"):
+        response["error"] = job["error"]
+        response["detail"] = job["error"]
+    return response
+
+
+def cleanup_ocr_jobs(now: float | None = None) -> None:
+    now = time.time() if now is None else now
+    cutoff = now - OCR_JOB_TTL_SECONDS
+    with OCR_JOBS_LOCK:
+        expired = [
+            job_id
+            for job_id, job in OCR_JOBS.items()
+            if job["status"] in {"done", "error"} and job["updated_at"] < cutoff
+        ]
+        for job_id in expired:
+            OCR_JOBS.pop(job_id, None)
+
+
+def update_ocr_job(job_id: str, **values: object) -> None:
+    with OCR_JOBS_LOCK:
+        job = OCR_JOBS.get(job_id)
+        if not job:
+            return
+        job.update(values)
+        job["updated_at"] = time.time()
+
+
+def run_ocr_job(job_id: str, upload_path: Path, filename: str, temp_root: Path) -> None:
+    update_ocr_job(
+        job_id,
+        status="running",
+        message="OCR 引擎初始化中，随后会逐页识别。",
+    )
+    try:
+        documents = parse_ocr(
+            upload_path,
+            lang="ch",
+            workers=1,
+            enable_angle_cls=True,
+            reuse_engine=True,
+        )
+        if not documents:
+            raise ValueError("OCR 没有返回可解析结果。")
+        update_ocr_job(
+            job_id,
+            status="done",
+            message="OCR 已完成。",
+            data=serialize_ocr_document(documents[0], filename=filename),
+        )
+    except RuntimeError as exc:
+        update_ocr_job(
+            job_id,
+            status="error",
+            message="OCR 引擎暂不可用。",
+            error=f"OCR 引擎暂不可用：{exc}",
+        )
+    except ValueError as exc:
+        update_ocr_job(
+            job_id,
+            status="error",
+            message="OCR 输入无法解析。",
+            error=str(exc),
+        )
+    except Exception as exc:
+        update_ocr_job(
+            job_id,
+            status="error",
+            message="OCR 识别失败。",
+            error=f"OCR 识别失败：{exc}",
+        )
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def create_ocr_job(upload_path: Path, *, filename: str, temp_root: Path) -> dict[str, object]:
+    cleanup_ocr_jobs()
+    now = time.time()
+    job_id = uuid4().hex
+    job: dict[str, Any] = {
+        "job_id": job_id,
+        "filename": filename,
+        "status": "queued",
+        "message": "OCR 任务已提交，正在等待后台 worker。",
+        "created_at": now,
+        "updated_at": now,
+        "data": None,
+        "error": None,
+    }
+    with OCR_JOBS_LOCK:
+        OCR_JOBS[job_id] = job
+    OCR_EXECUTOR.submit(run_ocr_job, job_id, upload_path, filename, temp_root)
+    return public_ocr_job(job)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -151,14 +268,15 @@ def parse_dynamic_tombs(payload: DynamicParserRequest) -> dict[str, object]:
     }
 
 
-@app.post("/ocr/parse")
+@app.post("/ocr/parse", status_code=202)
 async def parse_ocr_document(file: UploadFile = File(...)) -> dict[str, object]:
     filename = file.filename or "upload"
+    temp_root = Path(tempfile.mkdtemp(prefix="kaogu-ocr-upload-"))
 
-    with tempfile.TemporaryDirectory(prefix="kaogu-ocr-upload-") as temp_root:
+    try:
         upload_path = await save_upload_to_temp(
             file,
-            Path(temp_root),
+            temp_root,
             allowed_suffixes=set(IMAGE_EXTENSIONS) | {PDF_EXTENSION},
             max_bytes=settings.max_ocr_upload_bytes,
             max_mb=settings.max_ocr_upload_mb,
@@ -175,27 +293,20 @@ async def parse_ocr_document(file: UploadFile = File(...)) -> dict[str, object]:
                     ),
                 )
 
-        try:
-            documents = parse_ocr(
-                upload_path,
-                lang="ch",
-                workers=1,
-                enable_angle_cls=True,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=503, detail=f"OCR 引擎暂不可用：{exc}") from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"OCR 识别失败：{exc}") from exc
+        return create_ocr_job(upload_path, filename=filename, temp_root=temp_root)
+    except Exception:
+        shutil.rmtree(temp_root, ignore_errors=True)
+        raise
 
-    if not documents:
-        raise HTTPException(status_code=422, detail="OCR 没有返回可解析结果。")
 
-    return {
-        "ok": True,
-        "data": serialize_ocr_document(documents[0], filename=filename),
-    }
+@app.get("/ocr/jobs/{job_id}")
+def get_ocr_job(job_id: str) -> dict[str, object]:
+    cleanup_ocr_jobs()
+    with OCR_JOBS_LOCK:
+        job = OCR_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="OCR 任务不存在或已过期。")
+        return public_ocr_job(job)
 
 
 @app.post("/modelling/generate")
