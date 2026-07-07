@@ -231,26 +231,66 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
   - `/GIS` 上传最小 CSV 后调用 `http://127.0.0.1:8765/gis/generate` 返回 `200`
   - `/GIS` 页面显示墓葬数、站点数、坐标模式和“打开地图”
 
-## Step 8：再考虑 OCR
+## Step 8：接 OCR 第一条小闭环
 
-- OCR 暂时不要抢先做。
+- 状态：
+  - 已完成第一小步。
 
-- 原因：
-  - PaddleOCR 依赖重。
-  - 第一次运行可能下载模型。
-  - PDF 处理可能慢。
-  - 部署到 Railway 时可能遇到系统依赖问题。
+- 当前决策：
+  - OCR 输入以 PDF 为主。
+  - 同时兼容小图片。
+  - 第一版使用本地 PaddleOCR。
+  - 不接 Baidu OCR。
+  - 不修改、不依赖 `backend/baidu_ocr_demo.py`。
+  - 第一版仍然是同步接口，不先做异步 job。
 
-- 做 OCR 前先决定：
-  - 使用 PaddleOCR、本地 OCR、Baidu OCR、MinerU，还是多 engine。
-  - 最大上传文件大小。
-  - 最大 PDF 页数。
-  - 是否同步返回，还是改成异步 job。
+- 当前限制：
+  - 默认 OCR 上传大小：8MB。
+  - 默认 PDF 页数上限：5 页。
+  - 超过页数直接返回 413，不进入 OCR。
+  - 长 PDF、批量 PDF、异步队列以后再做。
 
-- 第一版 OCR 建议：
-  - 只测小图片。
-  - 再测小 PDF。
-  - 再考虑大 PDF 和异步任务。
+- 已新增后端接口：
+  - `POST /ocr/parse`
+
+- 后端返回：
+  - `text`
+  - `markdown`
+  - `pages`
+  - `stats.filename`
+  - `stats.engine`
+  - `stats.page_count`
+  - `stats.line_count`
+  - `stats.elapsed_seconds`
+
+- 已新增配置：
+  - `KAOGU_MAX_OCR_UPLOAD_MB=8`
+  - `KAOGU_MAX_OCR_PDF_PAGES=5`
+
+- 已改前端页面：
+  - `/OCR` 已从通用工具页改为专用上传页。
+  - 页面支持 PDF 或图片上传。
+  - 页面显示 OCR 状态、页数、文本行数、耗时、Markdown 预览和行级识别结果。
+  - 页面支持下载 TXT 和 Markdown。
+
+- 已验证：
+  - `uv run python -m py_compile backend/main.py backend/config.py backend/ocr.py` 通过。
+  - `mise exec -- pnpm --dir frontend typecheck` 通过。
+  - `mise exec -- git diff --check` 通过。
+  - PDF 页数统计可用。
+  - 1 页 PDF 可以走完整 `/ocr/parse` 响应结构。
+  - 超过 5 页 PDF 返回 `413`。
+  - 非 PDF/图片文件返回 `400`。
+
+- 尚未验证：
+  - 尚未用真实 PaddleOCR 跑一份真实 PDF。
+  - 原因是第一次运行可能下载模型，应该作为单独小步骤处理。
+
+- 下一小步：
+  - 准备一份 1 页或 2 页小 PDF。
+  - 真实调用 `/ocr/parse`。
+  - 确认 PaddleOCR 能在本机完成识别。
+  - 再用浏览器 `/OCR` 上传同一份 PDF 做前端联调。
 
 ## Step 9：接 Exa / Firecrawl / Baidu OCR 前的安全准备
 
@@ -305,12 +345,18 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=https://your-backend-domain
 
 ## 当前最推荐的下一件事
 
-- 做 Step 8 前的小决策，不直接大改 OCR。
+- 做 Step 8 的真实 OCR 小 PDF smoke test。
 
 - 也就是：
-  - 先决定 OCR 第一版只支持小图片还是也支持小 PDF。
-  - 先决定使用本地 OCR、MinerU、Baidu OCR，还是先做一个后端 mock/job 框架。
-  - 先定最大文件大小、页数、超时和错误返回格式。
+  - 找一份 1 页或 2 页 PDF。
+  - 先从后端直接调用 `POST /ocr/parse`。
+  - 如果第一次运行下载 PaddleOCR 模型，单独记录耗时和错误。
+  - 后端真实 OCR 成功后，再打开 `/OCR` 页面上传同一份 PDF。
+  - 确认前端能显示 Markdown、TXT 下载和行级识别结果。
   - 继续不修改、不依赖 `backend/baidu_ocr_demo.py`。
 
-- 决策通过后，再只做 OCR 的最小可行后端接口和前端联调。
+- 这一步通过后，再考虑：
+  - 长 PDF 是否改异步 job。
+  - 是否加入 OCR 队列状态。
+  - 是否接 MinerU 或 Baidu OCR 作为可选后端。
+  - 是否把 OCR 结果一键送到 `/DynamicParser`。
