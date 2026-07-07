@@ -13,9 +13,25 @@ import requests
 
 
 TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token"
-OCR_URL = "https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic"
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".pnm", ".webp"}
 SUPPORTED_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS | {".pdf"}
+OCR_ENDPOINTS = {
+    "general_basic": "/rest/2.0/ocr/v1/general_basic",
+    "accurate_basic": "/rest/2.0/ocr/v1/accurate_basic",
+    "general": "/rest/2.0/ocr/v1/general",
+    "accurate": "/rest/2.0/ocr/v1/accurate",
+    "handwriting": "/rest/2.0/ocr/v1/handwriting",
+    "table": "/rest/2.0/ocr/v1/table",
+    "doc_analysis_office": "/rest/2.0/ocr/v1/doc_analysis_office",
+    "ancient": "/rest/2.0/ocr/v1/ancient",
+}
+DEFAULT_RELEVANT_MODES = [
+    "accurate_basic",
+    "general",
+    "handwriting",
+    "table",
+    "ancient",
+]
 
 
 class BaiduOCRClient:
@@ -26,12 +42,15 @@ class BaiduOCRClient:
         app_id: str | None = None,
         dpi: int = 200,
         timeout: int = 60,
+        mode: str = "accurate_basic",
     ) -> None:
         self.api_key = api_key or self._get_required_env("BAIDU_OCR_API_KEY")
         self.secret_key = secret_key or self._get_required_env("BAIDU_OCR_SECRET_KEY")
         self.app_id = app_id or os.getenv("BAIDU_OCR_APP_ID", "")
         self.dpi = dpi
         self.timeout = timeout
+        self.mode = mode
+        self.endpoint = self._resolve_endpoint(mode)
 
     @staticmethod
     def _get_required_env(name: str) -> str:
@@ -39,6 +58,13 @@ class BaiduOCRClient:
         if not value:
             raise RuntimeError(f"缺少环境变量: {name}")
         return value
+
+    @staticmethod
+    def _resolve_endpoint(mode: str) -> str:
+        endpoint = OCR_ENDPOINTS.get(mode)
+        if not endpoint:
+            raise ValueError(f"不支持的 OCR 模式: {mode}")
+        return f"https://aip.baidubce.com{endpoint}"
 
     def get_access_token(self) -> str:
         response = requests.get(
@@ -83,24 +109,62 @@ class BaiduOCRClient:
 
         return pages
 
+    def build_request_data(self, image_path: Path) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "image": base64.b64encode(image_path.read_bytes()).decode("utf-8")
+        }
+        if self.mode in {"general", "accurate"}:
+            data["paragraph"] = "true"
+        return data
+
     def call_ocr_for_image(self, image_path: Path, access_token: str) -> dict[str, Any]:
-        image_base64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
         response = requests.post(
-            f"{OCR_URL}?access_token={access_token}",
+            f"{self.endpoint}?access_token={access_token}",
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            data={"image": image_base64},
+            data=self.build_request_data(image_path),
             timeout=self.timeout,
         )
         response.raise_for_status()
         return response.json()
 
-    @staticmethod
-    def extract_text(result: dict[str, Any]) -> str:
-        return "\n".join(
-            item.get("words", "").strip()
-            for item in result.get("words_result", [])
-            if item.get("words", "").strip()
-        )
+    def extract_text(self, result: dict[str, Any]) -> str:
+        if self.mode == "table":
+            lines = []
+            for row in result.get("body", []) or []:
+                cells = []
+                for cell in row.get("row", []) if isinstance(row, dict) else []:
+                    words = cell.get("word") or cell.get("words") or ""
+                    if isinstance(words, list):
+                        words = " ".join(str(item) for item in words)
+                    if words:
+                        cells.append(str(words).strip())
+                if cells:
+                    lines.append("\t".join(cells))
+            if lines:
+                return "\n".join(lines)
+
+        items = result.get("words_result", [])
+        lines = []
+        for item in items:
+            if isinstance(item, dict):
+                words = item.get("words") or item.get("word") or ""
+                if words:
+                    lines.append(str(words).strip())
+            elif isinstance(item, str):
+                lines.append(item.strip())
+
+        if lines:
+            return "\n".join(line for line in lines if line)
+
+        data = result.get("data")
+        if isinstance(data, dict):
+            content = data.get("content")
+            if isinstance(content, list):
+                return "\n".join(str(item).strip() for item in content if str(item).strip())
+            if isinstance(content, str):
+                return content.strip()
+
+        return ""
 
     def parse_file(self, path: str | Path) -> dict[str, Any]:
         input_path = Path(path).expanduser().resolve()
@@ -118,6 +182,7 @@ class BaiduOCRClient:
             pages.append(
                 {
                     "page": index,
+                    "mode": self.mode,
                     "source_image": str(image_path),
                     "text": self.extract_text(raw),
                     "raw": raw,
@@ -127,13 +192,43 @@ class BaiduOCRClient:
         return {
             "file_name": input_path.name,
             "file_path": str(input_path),
+            "mode": self.mode,
             "page_count": len(pages),
             "full_text": "\n\n".join(page["text"] for page in pages if page["text"]),
             "pages": pages,
         }
 
+    def parse_with_modes(self, path: str | Path, modes: list[str]) -> dict[str, Any]:
+        results = []
+        for mode in modes:
+            client = BaiduOCRClient(
+                api_key=self.api_key,
+                secret_key=self.secret_key,
+                app_id=self.app_id,
+                dpi=self.dpi,
+                timeout=self.timeout,
+                mode=mode,
+            )
+            results.append(client.parse_file(path))
+        input_path = Path(path).expanduser().resolve()
+        return {
+            "file_name": input_path.name,
+            "file_path": str(input_path),
+            "modes": modes,
+            "results": results,
+        }
+
 
 def format_text_output(result: dict[str, Any]) -> str:
+    if "results" in result:
+        sections = []
+        for mode_result in result["results"]:
+            sections.append(f"\n######## MODE: {mode_result['mode']} ########\n")
+            for page in mode_result["pages"]:
+                sections.append(f"\n===== Page {page['page']} =====\n")
+                sections.append(page["text"])
+        return "\n".join(sections).strip() + "\n"
+
     chunks = []
     for page in result["pages"]:
         chunks.append(f"\n===== Page {page['page']} =====\n")
@@ -147,16 +242,27 @@ def main() -> None:
     parser.add_argument("-o", "--output", help="输出文件路径，不传则打印到终端")
     parser.add_argument("--json", action="store_true", help="输出完整 JSON，包括每页原始 OCR 返回")
     parser.add_argument("--dpi", type=int, default=200, help="PDF 渲染 DPI，默认 200")
+    parser.add_argument(
+        "--mode",
+        default="accurate_basic",
+        choices=sorted(OCR_ENDPOINTS.keys()),
+        help="OCR 模式，默认 accurate_basic",
+    )
+    parser.add_argument(
+        "--all-relevant",
+        action="store_true",
+        help="依次运行考古 PDF 可能相关的多个 OCR 接口",
+    )
     args = parser.parse_args()
 
-    client = BaiduOCRClient(dpi=args.dpi)
-    result = client.parse_file(args.file)
-
-    content = (
-        json.dumps(result, ensure_ascii=False, indent=2)
-        if args.json
-        else format_text_output(result)
+    client = BaiduOCRClient(dpi=args.dpi, mode=args.mode)
+    result = (
+        client.parse_with_modes(args.file, DEFAULT_RELEVANT_MODES)
+        if args.all_relevant
+        else client.parse_file(args.file)
     )
+
+    content = json.dumps(result, ensure_ascii=False, indent=2) if args.json else format_text_output(result)
 
     if args.output:
         output_path = Path(args.output).expanduser().resolve()
