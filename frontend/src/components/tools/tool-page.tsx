@@ -22,7 +22,7 @@ export function ToolPage({ slug }: { slug: string }) {
 
       <main className="flex-1">
         <ToolHero tool={tool} />
-        <section className="mx-auto max-w-6xl px-5 pb-14">
+        <section className="mx-auto max-w-[var(--site-max-width)] px-[var(--site-gutter)] pb-[var(--page-block)]">
           <GenericToolWorkbench tool={workbenchTool} />
         </section>
       </main>

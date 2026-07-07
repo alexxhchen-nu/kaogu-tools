@@ -91,8 +91,8 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
         </div>
 
         <div className="mt-5 border border-foreground bg-background p-3">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-accent">
-            API endpoint
+          <p className="text-xs font-black text-foreground/60">
+            接口路径
           </p>
           <code className="mt-1 block break-all font-mono text-sm text-foreground">
             {tool.endpoint}

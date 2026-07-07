@@ -195,7 +195,7 @@ export default function ModellingPage() {
       <style>{`
         .model-page {
           min-height: 100vh;
-          padding: 28px;
+          padding: var(--page-block) var(--site-gutter);
           background:
             linear-gradient(90deg, rgba(184, 68, 47, 0.08) 0 1px, transparent 1px 100%),
             var(--paper);
@@ -203,10 +203,11 @@ export default function ModellingPage() {
         }
 
         .model-panel {
+          width: min(100%, var(--site-max-width));
           max-width: 720px;
           border: 1px solid var(--line);
           background: var(--panel);
-          padding: 28px;
+          padding: clamp(22px, 4vw, 32px);
           box-shadow: var(--shadow);
         }
 
@@ -224,9 +225,10 @@ export default function ModellingPage() {
         .model-heading h1 {
           margin: 0;
           color: var(--ink);
-          font-size: 34px;
+          font-size: clamp(30px, 5vw, 40px);
           font-weight: 400;
           letter-spacing: 0;
+          line-height: 1.18;
         }
 
         .upload-form {
@@ -299,10 +301,6 @@ export default function ModellingPage() {
 
           .model-panel {
             padding: 20px;
-          }
-
-          .model-heading h1 {
-            font-size: 28px;
           }
         }
       `}</style>

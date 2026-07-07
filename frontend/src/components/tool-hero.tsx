@@ -6,27 +6,26 @@ export function ToolHero({ tool }: { tool: ToolMeta }) {
   const Icon = tool.icon
   return (
     <div className="bg-background">
-      <div className="mx-auto max-w-6xl px-5 py-10">
-        <nav className="mb-8 flex items-center gap-1.5 text-xs font-bold text-foreground/60">
+      <div className="mx-auto max-w-[var(--site-max-width)] px-[var(--site-gutter)] py-[var(--page-block)]">
+        <nav className="mb-6 flex items-center gap-1.5 text-xs font-bold text-foreground/60">
           <Link href="/" className="hover:text-accent">
             首页
           </Link>
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-foreground">{tool.name}</span>
         </nav>
-        <div className="grid gap-8 border-y border-foreground py-8 md:grid-cols-[auto_1fr_auto] md:items-center">
-          <span className="grid h-28 w-28 shrink-0 place-items-center border border-foreground">
-            <Icon className="h-12 w-12" strokeWidth={1.6} />
+        <div className="grid gap-6 border-y border-foreground py-7 md:grid-cols-[auto_1fr_auto] md:items-center">
+          <span className="grid h-24 w-24 shrink-0 place-items-center border border-foreground">
+            <Icon className="h-11 w-11" strokeWidth={1.6} />
           </span>
           <div>
-            <p className="text-sm font-black text-accent">{tool.index}</p>
-            <h1 className="mt-2 font-serif text-4xl font-black leading-tight text-balance sm:text-5xl">
+            <h1 className="font-serif text-4xl font-black leading-tight text-balance sm:text-5xl">
               {tool.name}
             </h1>
-            <p className="mt-2 text-xs font-black uppercase tracking-[0.22em] text-foreground/60">
+            <p className="mt-2 text-xs font-black uppercase text-foreground/60">
               {tool.en}
             </p>
-            <p className="mt-5 max-w-2xl text-sm leading-7 text-foreground/70">
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-foreground/70">
               {tool.description}
             </p>
           </div>
