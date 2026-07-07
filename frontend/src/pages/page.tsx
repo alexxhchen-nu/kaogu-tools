@@ -10,9 +10,12 @@ export default function LandingPage() {
         <section className="toolbox-stage">
           <section className="toolbox-root" aria-label="根节点">
             <h1>考古工具箱</h1>
-            <span>统一入口，把文献、目录、墓葬、地图与模型收进同一个操作台。</span>
-            <div className="toolbox-root-status">
-              <BackendStatus />
+            <div className="toolbox-root-divider" aria-hidden="true" />
+            <div className="toolbox-root-copy">
+              <span>统一入口，把文献、目录、墓葬、地图与模型收进同一个操作台。</span>
+              <div className="toolbox-root-status">
+                <BackendStatus />
+              </div>
             </div>
           </section>
 

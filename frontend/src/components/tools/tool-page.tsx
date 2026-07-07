@@ -1,5 +1,4 @@
 import Head from "next/head"
-import { SiteFooter } from "@/components/site-footer"
 import { ToolHero } from "@/components/tool-hero"
 import { GenericToolWorkbench } from "@/components/tools/generic-tool-workbench"
 import { getTool } from "@/lib/tools"
@@ -14,19 +13,18 @@ export function ToolPage({ slug }: { slug: string }) {
   const { icon: _icon, ...workbenchTool } = tool
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="tool-page-shell">
       <Head>
         <title>{tool.name} · 考古工具箱</title>
         <meta name="description" content={tool.description} />
       </Head>
 
-      <main className="flex-1">
+      <main className="tool-page-main">
         <ToolHero tool={tool} />
-        <section className="mx-auto max-w-[var(--site-max-width)] px-[var(--site-gutter)] pb-[var(--page-block)]">
+        <section className="tool-workbench-section">
           <GenericToolWorkbench tool={workbenchTool} />
         </section>
       </main>
-      <SiteFooter />
     </div>
   )
 }

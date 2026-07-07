@@ -62,9 +62,9 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
           : TerminalSquare
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-      <section className="border border-foreground bg-background p-5">
-        <div className="flex items-start gap-3 border-b border-foreground pb-4">
+    <div className="tool-workbench">
+      <section className="tool-panel">
+        <div className="tool-panel-heading">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-foreground">
             <Icon className="h-5 w-5" strokeWidth={1.7} />
           </span>
@@ -76,7 +76,7 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
           </div>
         </div>
 
-        <div className="mt-5">
+        <div className="tool-input-body">
           {tool.inputMode === 'file' ? (
             <FileInput
               acceptedTypes={tool.acceptedTypes}
@@ -90,7 +90,7 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
           )}
         </div>
 
-        <div className="mt-5 border border-foreground bg-background p-3">
+        <div className="tool-endpoint">
           <p className="text-xs font-black text-foreground/60">
             接口路径
           </p>
@@ -102,7 +102,7 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
         <button
           onClick={run}
           disabled={state === 'loading'}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 bg-foreground px-5 text-sm font-black text-background transition-colors hover:bg-accent disabled:opacity-50"
+          className="tool-run-button"
         >
           {state === 'loading' ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -117,15 +117,17 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
         </button>
       </section>
 
-      <section className="border border-foreground bg-background p-5">
-        <div className="border-b border-foreground pb-4">
-          <h2 className="font-serif text-xl font-black">结果</h2>
-          <p className="mt-1 text-sm leading-7 text-foreground/70">
-            {tool.resultHint}
-          </p>
+      <section className="tool-panel">
+        <div className="tool-panel-heading">
+          <div>
+            <h2 className="font-serif text-xl font-black">结果</h2>
+            <p className="mt-1 text-sm leading-7 text-foreground/70">
+              {tool.resultHint}
+            </p>
+          </div>
         </div>
 
-        <div className="mt-5 min-h-72">
+        <div className="tool-result-body">
           {state === 'idle' && (
             <EmptyState text="运行工具后，后端返回的数据会显示在这里。" />
           )}
@@ -147,7 +149,7 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
           )}
 
           {state === 'done' && (
-            <pre className="max-h-[520px] overflow-auto bg-foreground p-4 text-xs leading-relaxed text-background">
+            <pre className="tool-result-output">
               {formatResult(result)}
             </pre>
           )}
@@ -196,7 +198,7 @@ function FileInput({
         if (dropped) onFile(dropped)
       }}
       onClick={onPick}
-      className="flex cursor-pointer flex-col items-center justify-center border border-dashed border-foreground bg-background px-6 py-12 text-center transition-colors hover:border-accent hover:text-accent"
+      className="file-dropzone"
     >
       <FileUp className="h-8 w-8" strokeWidth={1.6} />
       <p className="mt-4 font-serif text-base font-black">
@@ -238,7 +240,7 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       spellCheck={false}
       className={cn(
-        'min-h-56 w-full resize-y border border-foreground bg-background px-3 py-3 text-sm leading-7 outline-none focus:border-accent',
+        'tool-textarea',
         isJson && 'font-mono text-xs',
       )}
     />
@@ -253,7 +255,7 @@ function EmptyState({
   icon?: ReactNode
 }) {
   return (
-    <div className="flex h-72 flex-col items-center justify-center border border-dashed border-foreground bg-background px-6 text-center text-sm text-foreground/60">
+    <div className="tool-empty-state">
       {icon ?? <TerminalSquare className="h-5 w-5" strokeWidth={1.5} />}
       <p className="mt-3">{text}</p>
     </div>

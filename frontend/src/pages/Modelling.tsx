@@ -194,8 +194,11 @@ export default function ModellingPage() {
 
       <style>{`
         .model-page {
-          min-height: 100vh;
-          padding: var(--page-block) var(--site-gutter);
+          height: 100svh;
+          display: grid;
+          align-items: center;
+          overflow: hidden;
+          padding: clamp(1.75rem, 4vh, 3rem) clamp(2rem, 4.5vw, 4.5rem);
           background:
             linear-gradient(90deg, rgba(184, 68, 47, 0.08) 0 1px, transparent 1px 100%),
             var(--paper);
@@ -296,6 +299,9 @@ export default function ModellingPage() {
 
         @media (max-width: 640px) {
           .model-page {
+            min-height: 100svh;
+            height: auto;
+            overflow: visible;
             padding: 16px;
           }
 
