@@ -20,8 +20,8 @@
   --color-border: var(--ink);
   --color-input: var(--line);
   --color-ring: var(--seal);
-  --font-sans: "Swei Gothic SC", system-ui, sans-serif;
-  --font-serif: "Swei Gothic SC", system-ui, sans-serif;
+  --font-sans: "Noto Sans SC", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", serif;
   --radius-sm: 0;
   --radius-md: 0;
   --radius-lg: 0;
@@ -29,58 +29,18 @@
 }
 
 @font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Thin.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 100;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Light.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-DemiLight.ttf") format("truetype");
+  font-family: "Noto Serif SC";
+  src: url("/fonts/Noto/NotoSerifSC-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Regular.ttf") format("truetype");
+  font-family: "Noto Sans SC";
+  src: url("/fonts/Noto/NotoSansSC-VariableFont_wght.ttf") format("truetype");
   font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Medium.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Bold.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Swei Gothic SC";
-  src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Black.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 900;
+  font-weight: 100 900;
   font-display: swap;
 }
 
@@ -104,7 +64,7 @@
     --sidebar-width: 320px;
     --sidebar-tab-width: 54px;
     --shadow: 0 18px 44px rgba(54, 45, 31, 0.16);
-    font-family: "Swei Gothic SC", system-ui, sans-serif;
+    font-family: "Noto Sans SC", system-ui, sans-serif;
     color: var(--ink);
     background-color: var(--paper);
   }
@@ -114,12 +74,21 @@
   body {
     margin: 0;
     min-width: 320px;
-    font-family: "Swei Gothic SC", system-ui, sans-serif;
+    font-family: "Noto Sans SC", system-ui, sans-serif;
     color: var(--ink);
     background: var(--paper);
   }
 
   button, input, textarea { font: inherit; }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Noto Serif SC", serif;
+  }
 
   a { color: inherit; text-decoration: none; }
 }
@@ -513,7 +482,7 @@
     writing-mode: vertical-rl;
     text-orientation: mixed;
     max-width: 4ch;
-    font-family: "Swei Gothic SC", system-ui, sans-serif;
+    font-family: "Noto Serif SC", serif;
     font-size: 3rem;
     font-weight: 400;
     letter-spacing: 0;
@@ -522,7 +491,7 @@
   }
 
   .catalogue h2 {
-    font-family: "Swei Gothic SC", system-ui, sans-serif;
+    font-family: "Noto Serif SC", serif;
     font-weight: 400;
     line-height: 1;
     margin: 0;

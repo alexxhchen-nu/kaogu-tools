@@ -28,8 +28,16 @@ function writeLoadingTab(tab: Window, filename: string) {
   <title>正在生成墓葬3D模型</title>
   <style>
     @font-face {
-      font-family: "Swei Gothic SC";
-      src: url("/fonts/SC/獅尾腿圓體 SweiGothicLegCJKsc-Regular.ttf") format("truetype");
+      font-family: "Noto Sans SC";
+      src: url("/fonts/Noto/NotoSansSC-VariableFont_wght.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Noto Serif SC";
+      src: url("/fonts/Noto/NotoSerifSC-Regular.ttf") format("truetype");
       font-style: normal;
       font-weight: 400;
       font-display: swap;
@@ -42,10 +50,10 @@ function writeLoadingTab(tab: Window, filename: string) {
       place-items: center;
       background: #141417;
       color: #e8e4da;
-      font-family: "Swei Gothic SC", system-ui, sans-serif;
+      font-family: "Noto Sans SC", system-ui, sans-serif;
     }
     main { max-width: 520px; padding: 32px; line-height: 1.7; }
-    h1 { margin: 0 0 8px; font-size: 22px; }
+    h1 { margin: 0 0 8px; font-family: "Noto Serif SC", serif; font-size: 22px; }
     p { color: #aaa28f; }
   </style>
 </head>

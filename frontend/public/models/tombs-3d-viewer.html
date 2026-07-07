@@ -5,10 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>河北墓葬3D建模 - 考古可视化</title>
 <style>
+@font-face {
+  font-family:"Noto Sans SC";
+  src:url("/fonts/Noto/NotoSansSC-VariableFont_wght.ttf") format("truetype");
+  font-style:normal;
+  font-weight:100 900;
+  font-display:swap;
+}
+@font-face {
+  font-family:"Noto Serif SC";
+  src:url("/fonts/Noto/NotoSerifSC-Regular.ttf") format("truetype");
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
 * { box-sizing:border-box; }
 html, body { margin:0; height:100%; overflow:hidden; }
 body {
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-family:"Noto Sans SC",system-ui,sans-serif;
   color:#e8e4da; background:#141417;
 }
 button, input { font:inherit; }
@@ -19,7 +33,7 @@ button, input { font:inherit; }
 }
 .sidebar header { padding:16px 18px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
 .eyebrow { margin:0 0 4px; color:#aaa28f; font-size:12px; }
-h1 { margin:0; font-size:20px; line-height:1.25; font-weight:650; letter-spacing:0; }
+h1 { margin:0; font-family:"Noto Serif SC",serif; font-size:20px; line-height:1.25; font-weight:650; letter-spacing:0; }
 .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,.1); }
 .stat { background:#292a26; border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:8px; }
 .stat strong { display:block; font-size:18px; color:#fff; }
@@ -273,7 +287,7 @@ function addLabel(text, position, color=0xffffff) {
   ctx.strokeStyle = 'rgba(255,255,255,0.22)';
   ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
   ctx.fillStyle = hexColor(color);
-  ctx.font = '600 32px "PingFang SC", sans-serif';
+  ctx.font = '600 32px "Noto Sans SC", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(text).slice(0, 24), 256, 56);
