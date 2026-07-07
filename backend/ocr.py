@@ -167,8 +167,8 @@ class PaddleOCREngine:
             from paddleocr import PaddleOCR
         except ImportError as exc:  # pragma: no cover - depends on local env
             raise RuntimeError(
-                "PaddleOCR is not installed. Install it with `pip install paddleocr`, "
-                "plus a PaddlePaddle runtime matching your platform."
+                "PaddleOCR is not installed. Install the OCR extra with "
+                "`uv sync --extra ocr` or `pip install 'kaogu-tools[ocr]'`."
             ) from exc
 
         errors: list[Exception] = []

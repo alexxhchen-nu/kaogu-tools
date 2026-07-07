@@ -1,4 +1,5 @@
 import contextlib
+import importlib.util
 import io
 import shutil
 import tempfile
@@ -26,6 +27,10 @@ OCR_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="kaogu-ocr")
 OCR_JOBS: dict[str, dict[str, Any]] = {}
 OCR_JOBS_LOCK = threading.Lock()
 OCR_JOB_TTL_SECONDS = 60 * 60
+OCR_RUNTIME_HINT = (
+    "OCR 运行时未安装。请在支持大依赖的平台安装 `kaogu-tools[ocr]` "
+    "或运行 `uv sync --extra ocr`。"
+)
 
 app = FastAPI(title=settings.app_name)
 
@@ -133,6 +138,23 @@ def count_pdf_pages(path: Path) -> int:
         return len(pdf)
     finally:
         pdf.close()
+
+
+def require_ocr_runtime(*, include_pdf: bool = False) -> None:
+    required_modules = ["paddleocr", "paddle"]
+    if include_pdf:
+        required_modules.append("pypdfium2")
+
+    missing = [
+        module
+        for module in required_modules
+        if importlib.util.find_spec(module) is None
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"{OCR_RUNTIME_HINT} 缺少模块：{', '.join(missing)}。",
+        )
 
 
 def public_ocr_job(job: dict[str, Any]) -> dict[str, object]:
@@ -281,6 +303,8 @@ async def parse_ocr_document(file: UploadFile = File(...)) -> dict[str, object]:
             max_bytes=settings.max_ocr_upload_bytes,
             max_mb=settings.max_ocr_upload_mb,
         )
+
+        require_ocr_runtime(include_pdf=upload_path.suffix.lower() == PDF_EXTENSION)
 
         if upload_path.suffix.lower() == PDF_EXTENSION:
             page_count = count_pdf_pages(upload_path)
