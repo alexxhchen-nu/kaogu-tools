@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "@/lib/icons";
-import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BackendStatus } from "@/components/backend-status";
 import { TOOLS } from "@/lib/tools";
@@ -24,8 +23,6 @@ export default function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader />
-
       <main className="toolbox-home flex-1">
         <section className="toolbox-stage mx-auto max-w-7xl px-5 py-10 sm:py-14">
           <div className="toolbox-title mx-auto max-w-3xl text-center">
