@@ -22,7 +22,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 PDF_EXTENSION = ".pdf"
 DEFAULT_FORMATS = ("md",)
@@ -86,8 +85,12 @@ def parse(
     started = time.perf_counter()
 
     if worker_count == 1:
-        engine = PaddleOCREngine(lang=lang, device=device, enable_angle_cls=enable_angle_cls)
-        return [engine.parse_path(path, pdf_dpi=pdf_dpi, started=started) for path in paths]
+        engine = PaddleOCREngine(
+            lang=lang, device=device, enable_angle_cls=enable_angle_cls
+        )
+        return [
+            engine.parse_path(path, pdf_dpi=pdf_dpi, started=started) for path in paths
+        ]
 
     documents: list[OCRDocument] = []
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
@@ -169,7 +172,9 @@ class PaddleOCREngine:
                 errors.append(exc)
 
         details = "; ".join(str(error) for error in errors)
-        raise RuntimeError(f"Unable to initialize PaddleOCR with supported options: {details}")
+        raise RuntimeError(
+            f"Unable to initialize PaddleOCR with supported options: {details}"
+        )
 
     def _v3_config(self) -> dict[str, Any]:
         config: dict[str, Any] = {
@@ -222,7 +227,9 @@ def _parse_path_worker(
     pdf_dpi: int,
     started: float,
 ) -> OCRDocument:
-    engine = PaddleOCREngine(lang=lang, device=device, enable_angle_cls=enable_angle_cls)
+    engine = PaddleOCREngine(
+        lang=lang, device=device, enable_angle_cls=enable_angle_cls
+    )
     return engine.parse_path(path, pdf_dpi=pdf_dpi, started=started)
 
 
@@ -236,7 +243,9 @@ def discover_inputs(source: str | os.PathLike[str]) -> list[Path]:
     if not path.is_dir():
         raise FileNotFoundError(f"OCR source does not exist: {path}")
 
-    return sorted(file for file in path.rglob("*") if file.is_file() and is_supported_input(file))
+    return sorted(
+        file for file in path.rglob("*") if file.is_file() and is_supported_input(file)
+    )
 
 
 def is_supported_input(path: Path) -> bool:
@@ -267,7 +276,9 @@ def render_pdf_pages(path: Path, output_dir: Path, *, dpi: int = 180) -> list[Pa
         ) from exc
 
 
-def render_pdf_pages_with_pdfium(path: Path, output_dir: Path, *, dpi: int) -> list[Path]:
+def render_pdf_pages_with_pdfium(
+    path: Path, output_dir: Path, *, dpi: int
+) -> list[Path]:
     import pypdfium2 as pdfium
 
     output_paths: list[Path] = []
@@ -284,7 +295,9 @@ def render_pdf_pages_with_pdfium(path: Path, output_dir: Path, *, dpi: int) -> l
     return output_paths
 
 
-def render_pdf_pages_with_pymupdf(path: Path, output_dir: Path, *, dpi: int) -> list[Path]:
+def render_pdf_pages_with_pymupdf(
+    path: Path, output_dir: Path, *, dpi: int
+) -> list[Path]:
     import fitz
 
     output_paths: list[Path] = []
@@ -415,7 +428,9 @@ def is_v2_entry(value: Any) -> bool:
 
 
 def sort_lines(lines: Sequence[OCRLine]) -> list[OCRLine]:
-    return sorted(lines, key=lambda line: (box_top(line.box), box_left(line.box), line.text))
+    return sorted(
+        lines, key=lambda line: (box_top(line.box), box_left(line.box), line.text)
+    )
 
 
 def lines_to_text(lines: Sequence[OCRLine], *, y_gap: float = 14) -> str:
@@ -557,7 +572,9 @@ def document_to_markdown(document: OCRDocument) -> str:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Fast PaddleOCR parser for images and PDFs.")
+    parser = argparse.ArgumentParser(
+        description="Fast PaddleOCR parser for images and PDFs."
+    )
     parser.add_argument("source", help="Image, PDF, or directory to OCR.")
     parser.add_argument(
         "-o",
@@ -573,8 +590,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["md", "markdown", "txt", "json"],
         help="One or more output formats.",
     )
-    parser.add_argument("--lang", default="ch", help="PaddleOCR language code. Defaults to ch.")
-    parser.add_argument("--device", default=None, help="Optional device, e.g. cpu, gpu, gpu:0.")
+    parser.add_argument(
+        "--lang", default="ch", help="PaddleOCR language code. Defaults to ch."
+    )
+    parser.add_argument(
+        "--device", default=None, help="Optional device, e.g. cpu, gpu, gpu:0."
+    )
     parser.add_argument(
         "--workers",
         type=int,
