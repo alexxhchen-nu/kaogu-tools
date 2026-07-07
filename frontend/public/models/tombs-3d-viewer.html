@@ -26,19 +26,19 @@ body {
   color:#e8e4da; background:#141417;
 }
 button, input { font:inherit; }
-.shell { display:grid; grid-template-columns:340px minmax(0,1fr); height:100vh; }
+.shell { display:grid; grid-template-columns:340px minmax(0,1fr); height:100vh; min-height:0; }
 .sidebar {
   min-width:0; background:#1f211e; border-right:1px solid rgba(255,255,255,.12);
-  display:flex; flex-direction:column;
+  display:flex; flex-direction:column; height:100vh; min-height:0; overflow:hidden;
 }
-.sidebar header { padding:16px 18px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
+.sidebar header { flex:0 0 auto; padding:16px 18px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
 .eyebrow { margin:0 0 4px; color:#aaa28f; font-size:12px; }
 h1 { margin:0; font-family:"Noto Serif SC",serif; font-size:20px; line-height:1.25; font-weight:650; letter-spacing:0; }
-.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,.1); }
+.stats { flex:0 0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 18px; border-bottom:1px solid rgba(255,255,255,.1); }
 .stat { background:#292a26; border:1px solid rgba(255,255,255,.08); border-radius:6px; padding:8px; }
 .stat strong { display:block; font-size:18px; color:#fff; }
 .stat span { color:#aaa28f; font-size:11px; }
-.controls { padding:12px 18px; display:grid; gap:10px; border-bottom:1px solid rgba(255,255,255,.1); }
+.controls { flex:0 0 auto; padding:12px 18px; display:grid; gap:10px; border-bottom:1px solid rgba(255,255,255,.1); }
 .search { width:100%; border:1px solid rgba(255,255,255,.16); border-radius:6px; background:#151612; color:#fff; padding:9px 10px; outline:none; }
 .filter-row { display:flex; gap:8px; flex-wrap:wrap; }
 .chip {
@@ -46,7 +46,10 @@ h1 { margin:0; font-family:"Noto Serif SC",serif; font-size:20px; line-height:1.
   border-radius:6px; padding:6px 9px; cursor:pointer;
 }
 .chip.is-active { background:#d6a84f; border-color:#d6a84f; color:#17130b; }
-.tomb-list { flex:1; overflow:auto; padding:10px; }
+.tomb-list {
+  flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; padding:10px;
+  overscroll-behavior:contain; scrollbar-gutter:stable; -webkit-overflow-scrolling:touch;
+}
 .tomb-item {
   width:100%; text-align:left; color:inherit; cursor:pointer; border:1px solid transparent;
   background:transparent; border-radius:6px; padding:10px; display:grid; gap:5px;
@@ -82,7 +85,7 @@ h1 { margin:0; font-family:"Noto Serif SC",serif; font-size:20px; line-height:1.
 .empty { padding:24px; color:#aaa28f; }
 @media (max-width: 780px) {
   .shell { grid-template-columns:1fr; grid-template-rows:280px minmax(0,1fr); }
-  .sidebar { border-right:0; border-bottom:1px solid rgba(255,255,255,.12); }
+  .sidebar { height:280px; border-right:0; border-bottom:1px solid rgba(255,255,255,.12); }
   .info-panel { grid-template-columns:1fr; max-height:220px; }
   #canvas-container { bottom:220px; }
 }
