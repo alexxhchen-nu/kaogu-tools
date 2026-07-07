@@ -31,12 +31,18 @@ export default function LandingPage() {
                   rel="noreferrer"
                   className="toolbox-list-item"
                 >
-                  <span className="toolbox-list-icon">
-                    <Icon className="h-6 w-6" />
+                  <span className="toolbox-list-media" data-index={tool.index}>
+                    <span className="toolbox-list-icon">
+                      <Icon className="h-12 w-12" />
+                    </span>
                   </span>
                   <span className="toolbox-list-copy">
                     <strong>{tool.name}</strong>
                     <em>{tool.tagline}</em>
+                    <span className="toolbox-list-actions">
+                      <span className="toolbox-list-button">打开工具</span>
+                      <span className="toolbox-list-meta">{tool.en}</span>
+                    </span>
                   </span>
                   <ChevronRight className="toolbox-list-arrow h-4 w-4" />
                 </Link>
