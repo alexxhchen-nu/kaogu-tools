@@ -611,7 +611,14 @@
 }
 
 .tool-hero {
-  background: transparent;
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  padding-bottom: clamp(0.8rem, 1.6vh, 1.2rem);
+  background:
+    linear-gradient(90deg, rgba(35, 32, 26, 0.06) 1px, transparent 1px),
+    #eeeeec;
+  background-size: 72px 100%, auto;
 }
 
 .tool-hero-inner {
@@ -887,7 +894,11 @@
 }
 
 .library-controls {
+  position: sticky;
+  top: clamp(15.8rem, 25vh, 18.5rem);
   gap: clamp(1rem, 2vh, 1.4rem);
+  max-height: calc(100svh - clamp(15.8rem, 25vh, 18.5rem) - 2rem);
+  overflow: auto;
 }
 
 .library-search {
@@ -1131,7 +1142,10 @@
   }
 
   .library-controls {
+    position: static;
     min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 }
 

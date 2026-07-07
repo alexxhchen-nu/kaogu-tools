@@ -2,7 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import Head from "next/head"
 import type { GetStaticProps, InferGetStaticPropsType } from "next"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { ToolHero } from "@/components/tool-hero"
 import { getTool } from "@/lib/tools"
 
@@ -74,8 +74,8 @@ export default function LibraryPage({
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   const [query, setQuery] = useState("")
   const [activeSeries, setActiveSeries] = useState<SeriesId>("all")
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(
-    catalogue.books[0]?.id ?? null,
+  const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(
+    () => new Set(catalogue.books[0]?.id ? [catalogue.books[0].id] : []),
   )
 
   const visibleBooks = useMemo(() => {
@@ -96,17 +96,25 @@ export default function LibraryPage({
     })
   }, [activeSeries, catalogue.books, query])
 
-  useEffect(() => {
-    if (!visibleBooks.some((book) => book.id === selectedBookId)) {
-      setSelectedBookId(visibleBooks[0]?.id ?? null)
-    }
-  }, [selectedBookId, visibleBooks])
-
   const seriesDescription =
     activeSeries === "all"
       ? catalogue._meta.description
       : catalogue.seriesMeta[activeSeries].description
   const tool = getTool("library")
+
+  function toggleBook(bookId: string) {
+    setExpandedBookIds((current) => {
+      const next = new Set(current)
+
+      if (next.has(bookId)) {
+        next.delete(bookId)
+      } else {
+        next.add(bookId)
+      }
+
+      return next
+    })
+  }
 
   if (!tool) {
     return null
@@ -190,7 +198,7 @@ export default function LibraryPage({
                 <p className="empty-state">没有匹配结果，换一个地名、时代或遗址关键词试试。</p>
               ) : (
                 visibleBooks.map((book) => {
-                  const isSelected = selectedBookId === book.id
+                  const isExpanded = expandedBookIds.has(book.id)
                   const pdfUrl = buildAssetUrl(catalogue.baseUrls.pdf, book.filename)
                   const markdownUrl = buildAssetUrl(
                     catalogue.baseUrls.markdown,
@@ -201,14 +209,14 @@ export default function LibraryPage({
                   return (
                     <article
                       key={book.id}
-                      className={`book-row ${isSelected ? "is-expanded" : ""}`}
+                      className={`book-row ${isExpanded ? "is-expanded" : ""}`}
                       data-series={book.series}
                     >
                       <button
                         type="button"
-                        className={`book-card ${isSelected ? "is-selected" : ""}`}
-                        onClick={() => setSelectedBookId(book.id)}
-                        aria-pressed={isSelected}
+                        className={`book-card ${isExpanded ? "is-selected" : ""}`}
+                        onClick={() => toggleBook(book.id)}
+                        aria-expanded={isExpanded}
                       >
                         <div className="grid gap-2">
                           <strong>{book.title}</strong>
@@ -219,7 +227,7 @@ export default function LibraryPage({
                         <div className="book-meta">{book.description}</div>
                       </button>
 
-                      {isSelected ? (
+                      {isExpanded ? (
                         <>
                           <div className="book-node" aria-hidden="true" />
 
