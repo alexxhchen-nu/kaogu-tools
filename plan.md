@@ -35,6 +35,16 @@
   - `gis` 可以上传 CSV 并返回地图 HTML
   - `shared/tests` 里的 parser 测试通过
 
+- 已完成浏览器联调：
+  - `/DynamicParser` 可以从前端调用后端并显示真实结果
+  - `/Modelling` 可以上传 CSV、调用后端并打开 3D Blob 页面
+  - `/GIS` 已改成专用上传页，可以上传 CSV、调用后端并打开地图 Blob 页面
+
+- 当前本地端口情况：
+  - `127.0.0.1:8000` 已被旧版后端占用，只暴露 `/tools/*` 路由
+  - 本轮新版 FastAPI 后端运行在 `127.0.0.1:8765`
+  - `frontend/.env.local` 当前指向 `http://127.0.0.1:8765`
+
 ## 下一步总目标
 
 - 先让浏览器里的前端页面真正调用本地 FastAPI 后端。
@@ -49,6 +59,12 @@
 
 ```bash
 uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+- 如果 `8000` 已被旧服务占用，临时使用：
+
+```bash
+uv run uvicorn backend.main:app --host 127.0.0.1 --port 8765 --reload
 ```
 
 - 验证：
@@ -263,11 +279,12 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=https://your-backend-domain
 
 ## 当前最推荐的下一件事
 
-- 做 Step 1 到 Step 3。
+- 做 Step 6。
 
 - 也就是：
-  - 启动后端。
-  - 配好前端本地 API URL。
-  - 在浏览器里跑通 `/DynamicParser`。
+  - 把 `/DynamicParser` 的第一版 JSON dump 优化成更可读的结果页。
+  - 增加墓葬表格。
+  - 增加 Markdown 预览。
+  - 增加 CSV 下载按钮。
 
-- 这一步通过后，再继续 `/Modelling` 和 `/GIS`。
+- 这一步通过后，再继续 Step 7，统一优化 `/Modelling` 和 `/GIS` 的状态面板。

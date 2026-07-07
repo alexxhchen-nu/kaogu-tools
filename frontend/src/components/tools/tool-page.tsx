@@ -15,7 +15,7 @@ export function ToolPage({ slug }: { slug: string }) {
   return (
     <div className="tool-page-shell">
       <Head>
-        <title>{tool.name} · 考古工具箱</title>
+        <title>{`${tool.name} · 考古工具箱`}</title>
         <meta name="description" content={tool.description} />
       </Head>
 
