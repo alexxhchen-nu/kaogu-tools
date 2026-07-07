@@ -53,7 +53,12 @@ export default function LandingPage() {
                 <p className="toolbox-index">{activeTool.index}</p>
                 <h2>{activeTool.name}</h2>
                 <p className="toolbox-summary">{activeTool.tagline}</p>
-                <Link className="toolbox-open" href={activeTool.href}>
+                <Link
+                  className="toolbox-open"
+                  href={activeTool.href}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   打开{activeTool.name}
                   <ChevronRight className="h-4 w-4" />
                 </Link>
@@ -70,6 +75,8 @@ export default function LandingPage() {
                   <Link
                     key={tool.slug}
                     href={tool.href}
+                    target="_blank"
+                    rel="noreferrer"
                     className={`toolbox-node ${isActive ? "is-active" : ""}`}
                     style={
                       {
