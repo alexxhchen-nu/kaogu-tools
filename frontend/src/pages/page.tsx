@@ -7,11 +7,11 @@ import { BackendStatus } from "@/components/backend-status";
 import { TOOLS } from "@/lib/tools";
 
 const nodePositions = [
-  { x: 50, y: 2 },
-  { x: 86, y: 27 },
-  { x: 73, y: 82 },
-  { x: 27, y: 82 },
-  { x: 14, y: 27 },
+  { x: 50, y: 12 },
+  { x: 86, y: 36 },
+  { x: 72, y: 86 },
+  { x: 28, y: 86 },
+  { x: 14, y: 36 },
 ];
 
 export default function LandingPage() {
