@@ -40,6 +40,8 @@
   - `/Modelling` 可以上传 CSV、调用后端并打开 3D Blob 页面
   - `/GIS` 已改成专用上传页，可以上传 CSV、调用后端并打开地图 Blob 页面
   - `/DynamicParser` 已改成专用结果页，可以显示墓葬表格、Markdown 预览、JSON 预览和 CSV 下载按钮
+  - `/Modelling` 状态面板已显示墓葬数、形制数、器物记录和最近模型入口
+  - `/GIS` 结果面板已显示墓葬数、站点数、坐标模式和站点地图入口
 
 - 已完成界面清理：
   - Next.js 开发指示器已在 `frontend/next.config.mjs` 关闭
@@ -202,6 +204,9 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
 
 ## Step 7：优化 Modelling 和 GIS 状态面板
 
+- 状态：
+  - 已完成。
+
 - Modelling 显示：
   - 墓葬数量
   - 形制数量
@@ -218,6 +223,13 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
   - 用户能知道生成了什么。
   - 用户可以重新打开结果。
   - 失败状态有明确原因。
+
+- 已验证：
+  - `mise exec -- pnpm --dir frontend typecheck` 通过
+  - `/Modelling` 上传最小 CSV 后调用 `http://127.0.0.1:8765/modelling/generate` 返回 `200`
+  - `/Modelling` 页面显示墓葬数、形制数、器物记录和“重新打开最近生成的模型”
+  - `/GIS` 上传最小 CSV 后调用 `http://127.0.0.1:8765/gis/generate` 返回 `200`
+  - `/GIS` 页面显示墓葬数、站点数、坐标模式和“打开地图”
 
 ## Step 8：再考虑 OCR
 
@@ -293,12 +305,12 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=https://your-backend-domain
 
 ## 当前最推荐的下一件事
 
-- 做 Step 7。
+- 做 Step 8 前的小决策，不直接大改 OCR。
 
 - 也就是：
-  - 优化 `/Modelling` 和 `/GIS` 的状态面板。
-  - 显示更清楚的统计信息。
-  - 保留最近一次生成结果的重新打开入口。
-  - 把失败状态改得更明确。
+  - 先决定 OCR 第一版只支持小图片还是也支持小 PDF。
+  - 先决定使用本地 OCR、MinerU、Baidu OCR，还是先做一个后端 mock/job 框架。
+  - 先定最大文件大小、页数、超时和错误返回格式。
+  - 继续不修改、不依赖 `backend/baidu_ocr_demo.py`。
 
-- 这一步通过后，再考虑 OCR 的最小可行接入方案。
+- 决策通过后，再只做 OCR 的最小可行后端接口和前端联调。

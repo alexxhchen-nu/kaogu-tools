@@ -1254,6 +1254,29 @@
   line-height: 1.7;
 }
 
+.compact-empty-state {
+  min-height: 8rem;
+  flex: initial;
+  justify-content: center;
+  padding: 1rem;
+  color: rgba(35, 32, 26, 0.62);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.model-status-panel--loading .status {
+  color: var(--ink);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+}
+
+.model-status-panel--error .status {
+  border: 1px solid rgba(184, 68, 47, 0.34);
+  background: rgba(255, 253, 248, 0.42);
+  color: var(--seal);
+  padding: 0.9rem 1rem;
+}
+
 .gis-options {
   display: grid;
   gap: 0.85rem;
@@ -1333,6 +1356,14 @@
 .site-result-list {
   display: grid;
   gap: 0.7rem;
+}
+
+.site-result-list h3 {
+  margin: 0;
+  color: rgba(35, 32, 26, 0.66);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .site-result-row {

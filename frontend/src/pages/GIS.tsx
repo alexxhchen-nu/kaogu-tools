@@ -2,9 +2,11 @@ import Head from "next/head";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ToolHero } from "@/components/tool-hero";
 import { resolveEndpoint } from "@/lib/api-client";
+import { FileUp, Loader2, MapPinned } from "@/lib/icons";
 import { getTool } from "@/lib/tools";
 
 type CoordMode = "auto" | "exact" | "jitter" | "none";
+type RunState = "idle" | "loading" | "done" | "error";
 
 type GISStats = {
   total_tombs?: number;
@@ -29,6 +31,30 @@ type SiteMapResult = {
   count?: number;
   url: string;
 };
+
+const coordModeLabels: Record<CoordMode, string> = {
+  auto: "自动检测",
+  exact: "精确坐标",
+  jitter: "站点中心偏移",
+  none: "站点中心",
+};
+
+function formatStat(value: number | undefined) {
+  return Number.isFinite(value) ? String(value) : "—";
+}
+
+function formatSiteCount(count: number | undefined) {
+  return typeof count === "number" ? `${count} 座墓葬` : "站点地图";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
 
 function writeLoadingTab(tab: Window, filename: string) {
   tab.document.open();
@@ -78,6 +104,12 @@ function writeLoadingTab(tab: Window, filename: string) {
   tab.document.close();
 }
 
+function writeErrorTab(tab: Window, message: string) {
+  tab.document.open();
+  tab.document.write(`<pre style="white-space:pre-wrap;font:14px monospace;padding:24px">${escapeHtml(message)}</pre>`);
+  tab.document.close();
+}
+
 function revokeUrls(urls: string[]) {
   for (const url of urls) {
     URL.revokeObjectURL(url);
@@ -87,6 +119,7 @@ function revokeUrls(urls: string[]) {
 export default function GISPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState("选择一个包含遗址、墓葬或坐标字段的 CSV 文件。");
+  const [runState, setRunState] = useState<RunState>("idle");
   const [isGenerating, setIsGenerating] = useState(false);
   const [coordMode, setCoordMode] = useState<CoordMode>("auto");
   const [includeOverview, setIncludeOverview] = useState(false);
@@ -119,6 +152,7 @@ export default function GISPage() {
     }
 
     setIsGenerating(true);
+    setRunState("loading");
     setStatus("正在上传并生成地图...");
     setStats(null);
     setSiteMaps([]);
@@ -166,6 +200,7 @@ export default function GISPage() {
       setSiteMaps(nextSiteMaps);
       setOverviewUrl(nextOverviewUrl);
       setStats(payload.data?.stats ?? null);
+      setRunState("done");
 
       const targetUrl = nextOverviewUrl ?? nextSiteMaps[0]?.url;
       if (targetUrl) {
@@ -186,10 +221,10 @@ export default function GISPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败。";
       replaceGeneratedUrls([]);
+      setRunState("error");
+      setStats(null);
       if (resultTab) {
-        resultTab.document.open();
-        resultTab.document.write(`<pre style="white-space:pre-wrap;font:14px monospace;padding:24px">${message}</pre>`);
-        resultTab.document.close();
+        writeErrorTab(resultTab, message);
       }
       setStatus(message);
     } finally {
@@ -260,6 +295,7 @@ export default function GISPage() {
 
                   <div className="actions">
                     <button type="submit" disabled={!selectedFile || isGenerating}>
+                      {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
                       {isGenerating ? "生成中..." : "生成并打开地图"}
                     </button>
                   </div>
@@ -276,41 +312,50 @@ export default function GISPage() {
                   </div>
                 </div>
 
-                <div className="model-status-panel gis-results-panel">
+                <div className={`model-status-panel gis-results-panel model-status-panel--${runState}`}>
+                  {runState === "idle" ? (
+                    <div className="tool-empty-state compact-empty-state">
+                      <p>生成后会显示墓葬总数、站点数、坐标模式，并保留总览和站点地图入口。</p>
+                    </div>
+                  ) : null}
+
                   <p className="status">{status}</p>
 
                   {stats ? (
                     <dl className="stats-grid">
                       <div>
                         <dt>墓葬数</dt>
-                        <dd>{stats.total_tombs ?? 0}</dd>
+                        <dd>{formatStat(stats.total_tombs)}</dd>
                       </div>
                       <div>
                         <dt>站点数</dt>
-                        <dd>{stats.site_count ?? siteMaps.length}</dd>
+                        <dd>{formatStat(stats.site_count ?? siteMaps.length)}</dd>
                       </div>
                       <div>
                         <dt>坐标模式</dt>
-                        <dd>{stats.coord_mode ?? coordMode}</dd>
+                        <dd>{coordModeLabels[stats.coord_mode ?? coordMode]}</dd>
                       </div>
                     </dl>
                   ) : null}
 
                   {overviewUrl ? (
                     <a className="result-link" href={overviewUrl} target="_blank" rel="noreferrer">
+                      <MapPinned className="h-4 w-4" />
                       打开总览地图
                     </a>
                   ) : null}
 
                   {siteMaps.length > 0 ? (
                     <div className="site-result-list">
+                      <h3>站点地图</h3>
                       {siteMaps.map((site) => (
                         <div className="site-result-row" key={site.key}>
                           <div>
                             <strong>{site.key}</strong>
-                            <span>{site.count ? `${site.count} 座墓葬` : "站点地图"}</span>
+                            <span>{formatSiteCount(site.count)}</span>
                           </div>
                           <a href={site.url} target="_blank" rel="noreferrer">
+                            <MapPinned className="h-4 w-4" />
                             打开地图
                           </a>
                         </div>

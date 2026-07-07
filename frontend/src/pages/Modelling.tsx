@@ -1,24 +1,39 @@
 import Head from "next/head";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ToolHero } from "@/components/tool-hero";
+import { resolveEndpoint } from "@/lib/api-client";
+import { Box, FileUp, Loader2 } from "@/lib/icons";
 import { getTool } from "@/lib/tools";
+
+type RunState = "idle" | "loading" | "done" | "error";
+
+type ModelStats = {
+  total_tombs?: number;
+  shape_count?: number;
+  artifact_count?: number;
+};
 
 type GenerateResponse = {
   html?: string;
   url?: string;
+  detail?: string;
   error?: string;
-  stats?: {
-    total_tombs?: number;
-    shape_count?: number;
-    artifact_count?: number;
-  };
+  stats?: ModelStats;
 };
 
 const demoModelUrl = "/models/tombs-3d-viewer.html";
 
-function modellingEndpoint() {
-  const base = process.env.NEXT_PUBLIC_KAOGU_API_BASE_URL?.replace(/\/$/, "") ?? "";
-  return `${base}/modelling/generate`;
+function formatStat(value: number | undefined) {
+  return Number.isFinite(value) ? String(value) : "—";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function writeLoadingTab(tab: Window, filename: string) {
@@ -69,9 +84,17 @@ function writeLoadingTab(tab: Window, filename: string) {
   tab.document.close();
 }
 
+function writeErrorTab(tab: Window, message: string) {
+  tab.document.open();
+  tab.document.write(`<pre style="white-space:pre-wrap;font:14px monospace;padding:24px">${escapeHtml(message)}</pre>`);
+  tab.document.close();
+}
+
 export default function ModellingPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState("选择一个墓葬 CSV 文件，生成结果会在新标签页打开。");
+  const [runState, setRunState] = useState<RunState>("idle");
+  const [stats, setStats] = useState<ModelStats | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
@@ -96,21 +119,23 @@ export default function ModellingPage() {
     }
 
     setIsGenerating(true);
+    setRunState("loading");
     setStatus("正在上传并生成模型...");
+    setStats(null);
     setResultUrl(null);
 
     try {
       const body = new FormData();
       body.append("file", selectedFile);
 
-      const response = await fetch(modellingEndpoint(), {
+      const response = await fetch(resolveEndpoint("/modelling/generate"), {
         method: "POST",
         body,
       });
 
       const payload = (await response.json()) as GenerateResponse;
-      if (!response.ok || payload.error) {
-        throw new Error(payload.error || `生成失败：HTTP ${response.status}`);
+      if (!response.ok || payload.error || payload.detail) {
+        throw new Error(payload.error || payload.detail || `生成失败：HTTP ${response.status}`);
       }
 
       let targetUrl = payload.url;
@@ -134,15 +159,17 @@ export default function ModellingPage() {
       }
 
       setResultUrl(targetUrl);
+      setStats(payload.stats ?? null);
+      setRunState("done");
       const count = payload.stats?.total_tombs;
       setStatus(count ? `已生成 ${count} 座墓葬模型，结果已在新标签页打开。` : "结果已在新标签页打开。");
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败。";
       if (resultTab) {
-        resultTab.document.open();
-        resultTab.document.write(`<pre style="white-space:pre-wrap;font:14px monospace;padding:24px">${message}</pre>`);
-        resultTab.document.close();
+        writeErrorTab(resultTab, message);
       }
+      setRunState("error");
+      setStats(null);
       setStatus(message);
     } finally {
       setIsGenerating(false);
@@ -191,9 +218,11 @@ export default function ModellingPage() {
 
                   <div className="actions">
                     <button type="submit" disabled={!selectedFile || isGenerating}>
+                      {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
                       {isGenerating ? "生成中..." : "生成并打开新标签页"}
                     </button>
                     <a href={demoModelUrl} target="_blank" rel="noreferrer">
+                      <Box className="h-4 w-4" />
                       打开示例模型
                     </a>
                   </div>
@@ -210,11 +239,35 @@ export default function ModellingPage() {
                   </div>
                 </div>
 
-                <div className="model-status-panel">
+                <div className={`model-status-panel model-status-panel--${runState}`}>
+                  {runState === "idle" ? (
+                    <div className="tool-empty-state compact-empty-state">
+                      <p>生成后会显示墓葬数量、形制数量、器物记录，并保留最近模型入口。</p>
+                    </div>
+                  ) : null}
+
                   <p className="status">{status}</p>
+
+                  {stats ? (
+                    <dl className="stats-grid model-stats-grid">
+                      <div>
+                        <dt>墓葬数</dt>
+                        <dd>{formatStat(stats.total_tombs)}</dd>
+                      </div>
+                      <div>
+                        <dt>形制数</dt>
+                        <dd>{formatStat(stats.shape_count)}</dd>
+                      </div>
+                      <div>
+                        <dt>器物记录</dt>
+                        <dd>{formatStat(stats.artifact_count)}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
 
                   {resultUrl ? (
                     <a className="result-link" href={resultUrl} target="_blank" rel="noreferrer">
+                      <Box className="h-4 w-4" />
                       重新打开最近生成的模型
                     </a>
                   ) : null}
