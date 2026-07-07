@@ -29,3 +29,6 @@ pnpm-debug.log*
 .claude/
 .vscode
 .zed
+
+# docs
+plan.md
