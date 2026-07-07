@@ -1,6 +1,6 @@
 import unittest
 
-from app.parser import auto_parse
+from backend.dynamic_parser import auto_parse
 
 
 class DynamicParserTests(unittest.TestCase):

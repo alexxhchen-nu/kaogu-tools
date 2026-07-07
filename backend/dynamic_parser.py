@@ -10,6 +10,7 @@ import re
 import json
 import csv
 import io
+import os
 from typing import Optional, Dict, Union
 
 try:
@@ -167,7 +168,8 @@ class WebTombParser:
     @staticmethod
     def chunk_text(text: str, chunk_size: int = 800) -> list[str]:
         """Split text into chunks using Chonkie when available, otherwise fall back to sentence-based splitting."""
-        if chonkie is not None:
+        use_semantic_chunker = os.getenv("KAOGU_USE_SEMANTIC_CHUNKER") == "1"
+        if use_semantic_chunker and chonkie is not None:
             try:
                 splitter = chonkie.SemanticChunker()
                 chunks = splitter.create(text)
