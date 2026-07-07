@@ -15,7 +15,7 @@ export function ToolHero({ tool }: { tool: ToolMeta }) {
           <span className="text-foreground">{tool.name}</span>
         </nav>
         <div className="tool-hero-box">
-          <span className="tool-hero-icon">
+          <span className="tool-hero-icon" data-index={tool.index}>
             <Icon className="h-11 w-11" strokeWidth={1.6} />
           </span>
           <div>

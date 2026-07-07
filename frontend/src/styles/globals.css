@@ -799,13 +799,6 @@
   overflow: auto;
 }
 
-.tool-endpoint {
-  margin-top: clamp(0.75rem, 1.6vh, 1rem);
-  border: 1px solid rgba(35, 32, 26, 0.18);
-  background: rgba(255, 253, 248, 0.42);
-  padding: 0.75rem;
-}
-
 .tool-run-button {
   display: inline-flex;
   width: 100%;
@@ -886,6 +879,219 @@
   line-height: 1.6;
 }
 
+.library-workbench {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(18rem, 0.42fr) minmax(0, 1fr);
+  gap: clamp(1.15rem, 2vh, 1.6rem);
+}
+
+.library-controls {
+  gap: clamp(1rem, 2vh, 1.4rem);
+}
+
+.library-search {
+  display: grid;
+  gap: 0.55rem;
+  color: rgba(35, 32, 26, 0.68);
+}
+
+.library-search span,
+.library-count em,
+.file-picker span {
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: 0.86rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.library-filters {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.library-filters .filter {
+  border-radius: 0;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+}
+
+.library-count {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: auto;
+  border-top: 1px solid rgba(35, 32, 26, 0.16);
+  padding-top: 1rem;
+}
+
+.library-count strong {
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 900;
+  line-height: 0.95;
+}
+
+.library-count span {
+  color: rgba(35, 32, 26, 0.68);
+  font-size: 1rem;
+}
+
+.library-count em {
+  margin-top: 0.4rem;
+  color: rgba(35, 32, 26, 0.58);
+}
+
+.library-workbench .catalogue {
+  max-width: none;
+}
+
+.library-workbench .book-list {
+  gap: 1rem;
+  margin-top: clamp(0.75rem, 1.6vh, 1rem);
+  padding-right: 0;
+}
+
+.library-workbench .book-row,
+.library-workbench .book-row.is-expanded {
+  max-width: none;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.library-workbench .book-node {
+  display: none !important;
+}
+
+.library-workbench .book-card {
+  gap: 0.85rem 1rem;
+  min-height: 0;
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  border-left: 0;
+  border-radius: 0;
+  background: rgba(255, 253, 248, 0.38);
+  box-shadow: 0 2px 0 rgba(35, 32, 26, 0.04);
+  padding: clamp(1rem, 2vw, 1.3rem);
+  grid-template-rows: auto auto;
+}
+
+.library-workbench .book-card::before {
+  content: "";
+  display: block;
+  width: 0.42rem;
+  min-height: 100%;
+  grid-row: 1 / -1;
+  background: var(--row-color);
+}
+
+.library-workbench .book-card {
+  grid-template-columns: 0.42rem minmax(0, 1fr);
+}
+
+.library-workbench .book-card > * {
+  grid-column: 2;
+}
+
+.library-workbench .book-card strong {
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: clamp(1.05rem, 1.6vw, 1.28rem);
+  font-weight: 900;
+}
+
+.library-workbench .book-card:hover,
+.library-workbench .book-card.is-selected {
+  border-color: rgba(35, 32, 26, 0.24);
+  box-shadow: 0 1rem 1.6rem rgba(35, 32, 26, 0.12);
+}
+
+.library-workbench .book-actions {
+  min-height: 0;
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  border-top: 0;
+  border-radius: 0;
+  background: rgba(255, 253, 248, 0.52);
+  background-image: none;
+  box-shadow: none;
+}
+
+.library-workbench .action-link {
+  min-height: 3.35rem;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+}
+
+.model-workbench {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: clamp(1.15rem, 2vh, 1.6rem);
+}
+
+.upload-form,
+.model-status-panel {
+  display: grid;
+  gap: 1rem;
+  margin-top: clamp(1rem, 2vh, 1.4rem);
+}
+
+.file-picker {
+  display: grid;
+  gap: 0.6rem;
+  color: rgba(35, 32, 26, 0.68);
+}
+
+.file-picker input {
+  min-height: 3.2rem;
+  border: 1px solid rgba(35, 32, 26, 0.18);
+  background: rgba(255, 253, 248, 0.42);
+  color: var(--ink);
+  padding: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.actions button,
+.actions a,
+.result-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(35, 32, 26, 0.7);
+  background: transparent;
+  color: var(--ink);
+  padding: 0 1.25rem;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.actions button {
+  cursor: pointer;
+}
+
+.actions button:hover,
+.actions a:hover,
+.result-link:hover {
+  border-color: var(--seal);
+  color: var(--seal);
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.status {
+  margin: 0;
+  color: rgba(35, 32, 26, 0.72);
+  line-height: 1.7;
+}
+
 @media (max-width: 900px) {
   .tool-page-shell {
     min-height: 100svh;
@@ -901,7 +1107,7 @@
     grid-template-columns: 1fr;
   }
 
-  .tool-hero-icon {
+.tool-hero-icon {
     min-height: 10rem;
     border-right: 0;
     border-bottom: 1px solid rgba(35, 32, 26, 0.12);
@@ -918,6 +1124,39 @@
   .tool-panel {
     min-height: 28rem;
   }
+
+  .library-workbench,
+  .model-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .library-controls {
+    min-height: 0;
+  }
+}
+
+.tool-hero-icon[data-index="二"] {
+  background:
+    linear-gradient(135deg, rgba(35, 32, 26, 0.16), transparent 46%),
+    #2c6f7e;
+}
+
+.tool-hero-icon[data-index="三"] {
+  background:
+    linear-gradient(135deg, rgba(35, 32, 26, 0.16), transparent 46%),
+    #73517a;
+}
+
+.tool-hero-icon[data-index="四"] {
+  background:
+    linear-gradient(135deg, rgba(35, 32, 26, 0.16), transparent 46%),
+    #8b6f3e;
+}
+
+.tool-hero-icon[data-index="五"] {
+  background:
+    linear-gradient(135deg, rgba(35, 32, 26, 0.16), transparent 46%),
+    #516b48;
 }
 
 @media (max-height: 760px) and (min-width: 901px) {
@@ -936,12 +1175,6 @@
     -webkit-line-clamp: 1;
   }
 
-  .tool-endpoint code {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
 .toolbox-home {
@@ -960,26 +1193,25 @@
   grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
   gap: clamp(1.5rem, 3vh, 2.25rem);
-  padding: clamp(1.5rem, 4vh, 3rem) clamp(1rem, 4vw, 4rem) clamp(2rem, 5vh, 4rem);
+  padding: 0 clamp(1rem, 4vw, 4rem) clamp(2rem, 5vh, 4rem);
 }
 
 .toolbox-root {
-  display: grid;
-  grid-template-columns: max-content 1px minmax(24rem, 1fr);
-  align-items: end;
-  column-gap: clamp(2.75rem, 6.5vw, 7rem);
-  min-height: 0;
-  padding: clamp(1rem, 2vh, 1.5rem) clamp(1.25rem, 3vw, 2.5rem);
-  border: 1px solid rgba(35, 32, 26, 0.12);
-  background: rgba(255, 253, 248, 0.45);
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding:
+    clamp(1.2rem, 3vh, 2.4rem)
+    max(clamp(1rem, 4vw, 4rem), calc((100vw - 82rem) / 2 + clamp(1rem, 4vw, 4rem)))
+    clamp(0.9rem, 2vh, 1.4rem);
+  border-bottom: 1px solid rgba(35, 32, 26, 0.2);
+  background:
+    linear-gradient(90deg, rgba(35, 32, 26, 0.06) 1px, transparent 1px),
+    #eeeeec;
+  background-size: 72px 100%, auto;
   text-align: left;
-}
-
-.toolbox-root p {
-  margin: 0 0 0.9rem;
-  color: var(--seal);
-  font-size: 0.9rem;
-  font-weight: 900;
 }
 
 .toolbox-root h1 {
@@ -993,36 +1225,13 @@
   white-space: nowrap;
 }
 
-.toolbox-root-divider {
-  width: 1px;
-  align-self: stretch;
-  background: rgba(35, 32, 26, 0.36);
-}
-
-.toolbox-root-copy {
-  display: grid;
-  max-width: 44rem;
-  gap: clamp(0.9rem, 2vh, 1.25rem);
-  padding-bottom: clamp(0.45rem, 1.2vh, 0.85rem);
-}
-
-.toolbox-root-copy span {
-  display: block;
-  color: rgba(35, 32, 26, 0.68);
-  font-size: clamp(0.98rem, 1.25vw, 1.12rem);
-  line-height: 1.7;
-}
-
-.toolbox-root-status {
-  margin-top: 0;
-}
-
 .toolbox-list {
   display: grid;
   width: 100%;
   min-height: 0;
   align-content: start;
   gap: clamp(1.15rem, 2vh, 1.6rem);
+  padding-top: clamp(0.35rem, 1.2vh, 0.9rem);
 }
 
 .toolbox-list-item {
@@ -1201,14 +1410,6 @@
     font-size: clamp(3.7rem, 6.2vw, 5.7rem);
   }
 
-  .toolbox-root-copy {
-    gap: 0.7rem;
-  }
-
-  .toolbox-root-copy span {
-    line-height: 1.55;
-  }
-
   .toolbox-list-item {
     min-height: 9.5rem;
   }
@@ -1239,25 +1440,13 @@
   }
 
   .toolbox-root {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    padding: 0;
+    padding-block: 1rem;
   }
 
   .toolbox-root h1 {
     max-width: none;
     font-size: clamp(2.55rem, 12vw, 4.35rem);
     white-space: normal;
-  }
-
-  .toolbox-root-divider {
-    width: 100%;
-    height: 1px;
-  }
-
-  .toolbox-root-copy {
-    max-width: 32rem;
-    padding-bottom: 0;
   }
 
   .toolbox-list {

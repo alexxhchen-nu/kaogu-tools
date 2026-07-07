@@ -90,15 +90,6 @@ export function GenericToolWorkbench({ tool }: { tool: WorkbenchTool }) {
           )}
         </div>
 
-        <div className="tool-endpoint">
-          <p className="text-xs font-black text-foreground/60">
-            接口路径
-          </p>
-          <code className="mt-1 block break-all font-mono text-sm text-foreground">
-            {tool.endpoint}
-          </code>
-        </div>
-
         <button
           onClick={run}
           disabled={state === 'loading'}

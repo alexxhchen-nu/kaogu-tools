@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ChevronRight } from "@/lib/icons";
-import { BackendStatus } from "@/components/backend-status";
 import { TOOLS } from "@/lib/tools";
 
 export default function LandingPage() {
@@ -10,13 +9,6 @@ export default function LandingPage() {
         <section className="toolbox-stage">
           <section className="toolbox-root" aria-label="根节点">
             <h1>考古工具箱</h1>
-            <div className="toolbox-root-divider" aria-hidden="true" />
-            <div className="toolbox-root-copy">
-              <span>统一入口，把文献、目录、墓葬、地图与模型收进同一个操作台。</span>
-              <div className="toolbox-root-status">
-                <BackendStatus />
-              </div>
-            </div>
           </section>
 
           <nav className="toolbox-list" aria-label="考古工具入口">

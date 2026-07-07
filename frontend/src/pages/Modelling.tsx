@@ -1,5 +1,7 @@
 import Head from "next/head";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { ToolHero } from "@/components/tool-hero";
+import { getTool } from "@/lib/tools";
 
 type GenerateResponse = {
   html?: string;
@@ -147,6 +149,12 @@ export default function ModellingPage() {
     }
   }
 
+  const tool = getTool("modelling");
+
+  if (!tool) {
+    return null;
+  }
+
   return (
     <>
       <Head>
@@ -155,161 +163,67 @@ export default function ModellingPage() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <main className="model-page">
-        <section className="model-panel">
-          <div className="model-heading">
-            <p>考古工具 / 3D 建模</p>
-            <h1>墓葬3D建模</h1>
-          </div>
+      <div className="tool-page-shell">
+        <main className="tool-page-main">
+          <ToolHero tool={tool} />
 
-          <form className="upload-form" onSubmit={handleSubmit}>
-            <label className="file-picker">
-              <span>CSV 数据文件</span>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              />
-            </label>
+          <section className="tool-workbench-section">
+            <div className="model-workbench">
+              <section className="tool-panel model-panel">
+                <div className="tool-panel-heading">
+                  <div>
+                    <h2 className="font-serif text-xl font-black">生成模型</h2>
+                    <p className="mt-1 text-sm leading-7 text-foreground/70">
+                      上传墓葬 CSV 后，生成结果会在新标签页打开。
+                    </p>
+                  </div>
+                </div>
 
-            <div className="actions">
-              <button type="submit" disabled={!selectedFile || isGenerating}>
-                {isGenerating ? "生成中..." : "生成并打开新标签页"}
-              </button>
-              <a href={demoModelUrl} target="_blank" rel="noreferrer">
-                打开示例模型
-              </a>
+                <form className="upload-form" onSubmit={handleSubmit}>
+                  <label className="file-picker">
+                    <span>CSV 数据文件</span>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+
+                  <div className="actions">
+                    <button type="submit" disabled={!selectedFile || isGenerating}>
+                      {isGenerating ? "生成中..." : "生成并打开新标签页"}
+                    </button>
+                    <a href={demoModelUrl} target="_blank" rel="noreferrer">
+                      打开示例模型
+                    </a>
+                  </div>
+                </form>
+              </section>
+
+              <section className="tool-panel model-panel">
+                <div className="tool-panel-heading">
+                  <div>
+                    <h2 className="font-serif text-xl font-black">状态</h2>
+                    <p className="mt-1 text-sm leading-7 text-foreground/70">
+                      生成完成后可以重新打开最近一次模型。
+                    </p>
+                  </div>
+                </div>
+
+                <div className="model-status-panel">
+                  <p className="status">{status}</p>
+
+                  {resultUrl ? (
+                    <a className="result-link" href={resultUrl} target="_blank" rel="noreferrer">
+                      重新打开最近生成的模型
+                    </a>
+                  ) : null}
+                </div>
+              </section>
             </div>
-          </form>
-
-          <p className="status">{status}</p>
-
-          {resultUrl ? (
-            <a className="result-link" href={resultUrl} target="_blank" rel="noreferrer">
-              重新打开最近生成的模型
-            </a>
-          ) : null}
-        </section>
-      </main>
-
-      <style>{`
-        .model-page {
-          height: 100svh;
-          display: grid;
-          align-items: center;
-          overflow: hidden;
-          padding: clamp(1.75rem, 4vh, 3rem) clamp(2rem, 4.5vw, 4.5rem);
-          background:
-            linear-gradient(90deg, rgba(184, 68, 47, 0.08) 0 1px, transparent 1px 100%),
-            var(--paper);
-          background-size: 24px 100%, auto;
-        }
-
-        .model-panel {
-          width: min(100%, var(--site-max-width));
-          max-width: 720px;
-          border: 1px solid var(--line);
-          background: var(--panel);
-          padding: clamp(22px, 4vw, 32px);
-          box-shadow: var(--shadow);
-        }
-
-        .model-heading {
-          padding-bottom: 18px;
-          border-bottom: 2px solid var(--ink);
-        }
-
-        .model-heading p {
-          margin: 0 0 6px;
-          color: var(--muted);
-          font-size: 14px;
-        }
-
-        .model-heading h1 {
-          margin: 0;
-          color: var(--ink);
-          font-size: clamp(30px, 5vw, 40px);
-          font-weight: 400;
-          letter-spacing: 0;
-          line-height: 1.18;
-        }
-
-        .upload-form {
-          display: grid;
-          gap: 18px;
-          margin-top: 24px;
-        }
-
-        .file-picker {
-          display: grid;
-          gap: 8px;
-          color: var(--muted);
-        }
-
-        .file-picker input {
-          min-height: 48px;
-          border: 1px solid var(--line);
-          background: var(--paper);
-          color: var(--ink);
-          padding: 10px;
-        }
-
-        .actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          align-items: center;
-        }
-
-        .actions button,
-        .actions a,
-        .result-link {
-          min-height: 42px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid var(--ink);
-          background: var(--ink);
-          color: var(--panel);
-          padding: 0 16px;
-          text-decoration: none;
-          cursor: pointer;
-        }
-
-        .actions a,
-        .result-link {
-          background: transparent;
-          color: var(--ink);
-        }
-
-        .actions button:disabled {
-          cursor: not-allowed;
-          opacity: 0.48;
-        }
-
-        .status {
-          margin: 18px 0 0;
-          color: var(--muted);
-          line-height: 1.7;
-        }
-
-        .result-link {
-          margin-top: 16px;
-        }
-
-        @media (max-width: 640px) {
-          .model-page {
-            min-height: 100svh;
-            height: auto;
-            overflow: visible;
-            padding: 16px;
-          }
-
-          .model-panel {
-            padding: 20px;
-          }
-        }
-      `}</style>
+          </section>
+        </main>
+      </div>
     </>
   );
 }
