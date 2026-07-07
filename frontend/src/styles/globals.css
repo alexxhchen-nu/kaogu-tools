@@ -886,6 +886,156 @@
   line-height: 1.6;
 }
 
+.parser-form {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.6vh, 1rem);
+  margin-top: clamp(1rem, 2vh, 1.4rem);
+}
+
+.parser-textarea {
+  min-height: clamp(19rem, 44vh, 31rem);
+}
+
+.parser-results-panel {
+  min-height: clamp(32rem, 58vh, 42rem);
+}
+
+.parser-result-body {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 1rem;
+  margin-top: clamp(1rem, 2vh, 1.4rem);
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.parser-error,
+.parser-empty-result {
+  border: 1px solid rgba(184, 68, 47, 0.34);
+  background: rgba(255, 253, 248, 0.42);
+  color: var(--seal);
+  padding: 0.9rem 1rem;
+  line-height: 1.7;
+}
+
+.parser-empty-result {
+  border-color: rgba(35, 32, 26, 0.16);
+  color: rgba(35, 32, 26, 0.68);
+}
+
+.parser-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.parser-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  background: rgba(255, 253, 248, 0.42);
+}
+
+.parser-table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  color: var(--ink);
+  table-layout: fixed;
+}
+
+.parser-table th,
+.parser-table td {
+  border-bottom: 1px solid rgba(35, 32, 26, 0.12);
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.parser-table th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: #f5f5f4;
+  color: rgba(35, 32, 26, 0.66);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.parser-table th:nth-child(1) { width: 12%; }
+.parser-table th:nth-child(2) { width: 12%; }
+.parser-table th:nth-child(3) { width: 20%; }
+.parser-table th:nth-child(4) { width: 12%; }
+.parser-table th:nth-child(5) { width: 18%; }
+.parser-table th:nth-child(6) { width: 26%; }
+
+.parser-table td {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.parser-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.parser-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.parser-result-actions button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px solid rgba(35, 32, 26, 0.7);
+  background: transparent;
+  color: var(--ink);
+  padding: 0 1.25rem;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.parser-result-actions button:hover {
+  border-color: var(--seal);
+  color: var(--seal);
+}
+
+.parser-result-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.parser-details {
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  background: rgba(255, 253, 248, 0.42);
+}
+
+.parser-details summary {
+  cursor: pointer;
+  border-bottom: 1px solid rgba(35, 32, 26, 0.12);
+  padding: 0.85rem 1rem;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-weight: 900;
+}
+
+.parser-details pre {
+  max-height: 20rem;
+  margin: 0;
+  overflow: auto;
+  padding: 1rem;
+  color: var(--ink);
+  font-size: 0.78rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
 .library-workbench {
   display: grid;
   min-height: 0;
@@ -1072,6 +1222,7 @@
   min-height: 2.75rem;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   border: 2px solid rgba(35, 32, 26, 0.7);
   background: transparent;
   color: var(--ink);
@@ -1272,6 +1423,10 @@
 
   .stats-grid,
   .site-result-row {
+    grid-template-columns: 1fr;
+  }
+
+  .parser-stats {
     grid-template-columns: 1fr;
   }
 
@@ -1664,6 +1819,10 @@
 
 @media (max-width: 640px) {
   .workspace { padding: 16px; }
+
+  .parser-table {
+    min-width: 44rem;
+  }
 
   .book-actions {
     grid-template-columns: 1fr;

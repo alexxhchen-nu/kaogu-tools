@@ -39,6 +39,10 @@
   - `/DynamicParser` 可以从前端调用后端并显示真实结果
   - `/Modelling` 可以上传 CSV、调用后端并打开 3D Blob 页面
   - `/GIS` 已改成专用上传页，可以上传 CSV、调用后端并打开地图 Blob 页面
+  - `/DynamicParser` 已改成专用结果页，可以显示墓葬表格、Markdown 预览、JSON 预览和 CSV 下载按钮
+
+- 已完成界面清理：
+  - Next.js 开发指示器已在 `frontend/next.config.mjs` 关闭
 
 - 当前本地端口情况：
   - `127.0.0.1:8000` 已被旧版后端占用，只暴露 `/tools/*` 路由
@@ -173,6 +177,9 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
 
 ## Step 6：优化 DynamicParser 结果展示
 
+- 状态：
+  - 已完成。
+
 - 第一版 JSON dump 跑通后，再做体验优化。
 
 - 建议展示：
@@ -185,6 +192,13 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
   - 用户不用读原始 JSON 也能看懂结果。
   - CSV 可以下载。
   - JSON 仍然可以复制或查看。
+
+- 已验证：
+  - `/DynamicParser` 调用 `http://127.0.0.1:8765/dynamic-parser/parse` 返回 `200`
+  - 页面显示 `M1` 墓葬表格结果
+  - Markdown 预览可见
+  - JSON 预览保留在折叠面板中
+  - CSV 下载可以实际触发
 
 ## Step 7：优化 Modelling 和 GIS 状态面板
 
@@ -279,12 +293,12 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=https://your-backend-domain
 
 ## 当前最推荐的下一件事
 
-- 做 Step 6。
+- 做 Step 7。
 
 - 也就是：
-  - 把 `/DynamicParser` 的第一版 JSON dump 优化成更可读的结果页。
-  - 增加墓葬表格。
-  - 增加 Markdown 预览。
-  - 增加 CSV 下载按钮。
+  - 优化 `/Modelling` 和 `/GIS` 的状态面板。
+  - 显示更清楚的统计信息。
+  - 保留最近一次生成结果的重新打开入口。
+  - 把失败状态改得更明确。
 
-- 这一步通过后，再继续 Step 7，统一优化 `/Modelling` 和 `/GIS` 的状态面板。
+- 这一步通过后，再考虑 OCR 的最小可行接入方案。

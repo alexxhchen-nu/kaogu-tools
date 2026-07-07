@@ -58,6 +58,16 @@ export function ChevronRight(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function Download(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </IconBase>
+  )
+}
+
 export function FileText(props: SVGProps<SVGSVGElement>) {
   return (
     <IconBase {...props}>
