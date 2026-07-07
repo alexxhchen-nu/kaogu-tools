@@ -281,16 +281,21 @@ NEXT_PUBLIC_KAOGU_API_BASE_URL=http://127.0.0.1:8000
   - 1 页 PDF 可以走完整 `/ocr/parse` 响应结构。
   - 超过 5 页 PDF 返回 `413`。
   - 非 PDF/图片文件返回 `400`。
+  - 真实 PaddleOCR 可以识别 1 页 PDF。
+  - 真实 OCR smoke test 返回 3 行中文文本。
+  - `/OCR` 浏览器上传 1 页 PDF 后可以显示 Markdown 预览。
+  - `/OCR` 浏览器上传 1 页 PDF 后可以显示“已识别 1 页、3 行文本”。
 
-- 尚未验证：
-  - 尚未用真实 PaddleOCR 跑一份真实 PDF。
-  - 原因是第一次运行可能下载模型，应该作为单独小步骤处理。
+- 暂未覆盖：
+  - 真实考古报告 PDF。
+  - 超过 5 页的长 PDF。
+  - 异步 job。
+  - 批量上传。
 
 - 下一小步：
-  - 准备一份 1 页或 2 页小 PDF。
-  - 真实调用 `/ocr/parse`。
-  - 确认 PaddleOCR 能在本机完成识别。
-  - 再用浏览器 `/OCR` 上传同一份 PDF 做前端联调。
+  - 用一份真实考古报告 PDF 的前 1-5 页测试。
+  - 记录识别速度和文字质量。
+  - 再决定长 PDF 是分页同步、异步 job，还是接 MinerU/Baidu OCR 作为可选后端。
 
 ## Step 9：接 Exa / Firecrawl / Baidu OCR 前的安全准备
 

@@ -102,7 +102,7 @@ export default function OCRPage() {
       const payload = (await response.json()) as OCRResponse;
 
       if (!response.ok || payload.error || payload.detail) {
-        throw new Error(payload.error || payload.detail || `OCR 失败：HTTP ${response.status}`);
+        throw new Error(payload.error || payload.detail || `OCR 请求失败，状态码 ${response.status}`);
       }
 
       const data = payload.data ?? null;
