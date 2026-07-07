@@ -160,7 +160,7 @@ export default function DynamicParserPage() {
                   <div>
                     <h2 className="font-serif text-xl font-black">输入文本</h2>
                     <p className="mt-1 text-sm leading-7 text-foreground/70">
-                      粘贴墓葬段落、OCR 后的 Markdown 或发掘简报正文。
+                      粘贴墓葬段落、Markdown 或发掘简报正文。
                     </p>
                   </div>
                 </div>

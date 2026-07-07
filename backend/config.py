@@ -25,20 +25,9 @@ class Settings(BaseSettings):
         default=25,
         validation_alias=AliasChoices("KAOGU_MAX_UPLOAD_MB", "MAX_UPLOAD_MB"),
     )
-    max_ocr_upload_mb: int = Field(
-        default=8,
-        validation_alias=AliasChoices("KAOGU_MAX_OCR_UPLOAD_MB", "MAX_OCR_UPLOAD_MB"),
-    )
-    max_ocr_pdf_pages: int = Field(
-        default=50,
-        validation_alias=AliasChoices("KAOGU_MAX_OCR_PDF_PAGES", "MAX_OCR_PDF_PAGES"),
-    )
 
     exa_api_key: str = ""
     firecrawl_api_key: str = ""
-    baidu_ocr_api_key: str = ""
-    baidu_ocr_secret_key: str = ""
-    baidu_ocr_app_id: str = ""
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
@@ -58,10 +47,6 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
-
-    @property
-    def max_ocr_upload_bytes(self) -> int:
-        return self.max_ocr_upload_mb * 1024 * 1024
 
 
 @lru_cache

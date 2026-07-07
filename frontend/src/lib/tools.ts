@@ -1,4 +1,4 @@
-import { Box, Braces, FileText, MapPinned, Search } from "@/lib/icons"
+import { Box, Braces, MapPinned, Search } from "@/lib/icons"
 import type { IconComponent } from "@/lib/icons"
 
 export type ToolInputMode = 'file' | 'text' | 'json' | 'query'
@@ -21,22 +21,6 @@ export interface ToolMeta {
 
 export const TOOLS: ToolMeta[] = [
   {
-    slug: 'ocr',
-    href: '/OCR',
-    name: '考古文献解析',
-    en: '文献解析工作台',
-    tagline: '上传 PDF 或扫描图片，提取可继续整理的文字结果',
-    description:
-      '面向发掘报告、简报、图录与扫描件的解析入口。第一版先支持小 PDF 和扫描图片同步 OCR，后续再扩展长文档、版面分析、表格抽取和异步任务。',
-    icon: FileText,
-    endpoint: '/ocr/parse',
-    inputMode: 'file',
-    acceptedTypes: 'application/pdf,.pdf,image/png,image/jpeg,image/webp,image/bmp,image/tiff,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff',
-    exampleInput: '上传一份页数较少的考古报告 PDF，或一张清晰的扫描图片',
-    resultHint: '返回识别文本、Markdown、文本行数量、识别耗时和可下载结果。',
-    index: '一',
-  },
-  {
     slug: 'library',
     href: '/Library',
     name: '资料库检索',
@@ -49,7 +33,7 @@ export const TOOLS: ToolMeta[] = [
     inputMode: 'query',
     exampleInput: '战国 唐县 墓地',
     resultHint: '目录页本身已经提供本地筛选；如接入后端，可返回命中记录、来源片段、筛选项和详情页链接。',
-    index: '二',
+    index: '一',
   },
   {
     slug: 'dynamic-parser',
@@ -58,13 +42,13 @@ export const TOOLS: ToolMeta[] = [
     en: '文本抽取工作台',
     tagline: '从报告文本中抽取墓葬、器物与尺寸字段',
     description:
-      '对应 backend/dynamic_parser.py 的结构化抽取能力。适合粘贴 OCR 后的 Markdown、简报正文或墓葬段落，输出可继续建模或制表的 JSON/CSV 数据。',
+      '对应 backend/dynamic_parser.py 的结构化抽取能力。适合粘贴 Markdown、简报正文或墓葬段落，输出可继续建模或制表的 JSON/CSV 数据。',
     icon: Braces,
     endpoint: '/dynamic-parser/parse',
     inputMode: 'text',
     exampleInput: 'M1，长方形竖穴土坑墓。墓口长3.4、宽1.8、深2.1米，随葬陶罐1件。',
     resultHint: '建议返回墓葬编号、年代、形制、尺寸、墓向、随葬器物和 parser 置信说明。',
-    index: '三',
+    index: '二',
   },
   {
     slug: 'modelling',
@@ -80,7 +64,7 @@ export const TOOLS: ToolMeta[] = [
     acceptedTypes: '.csv,text/csv',
     exampleInput: '上传包含墓葬编号、墓葬形制、墓口长、墓口宽、墓深等列的 CSV 文件',
     resultHint: '建议返回模型 URL、场景 JSON、尺寸校验、风险提示与预览截图。',
-    index: '四',
+    index: '三',
   },
   {
     slug: 'gis',
@@ -96,7 +80,7 @@ export const TOOLS: ToolMeta[] = [
     acceptedTypes: '.csv,text/csv',
     exampleInput: '上传包含遗址、墓葬、坐标或地点字段的 CSV 文件',
     resultHint: '建议返回 GeoJSON、地点匹配置信度、地图视图范围和未匹配地名。',
-    index: '五',
+    index: '四',
   },
 ]
 

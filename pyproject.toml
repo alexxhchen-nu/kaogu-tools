@@ -13,12 +13,5 @@ dependencies = [
     "uvicorn[standard]>=0.50.2",
 ]
 
-[project.optional-dependencies]
-ocr = [
-    "paddleocr>=3.0.0",
-    "paddlepaddle>=3.0.0",
-    "pypdfium2>=4.30.0",
-]
-
 [tool.vercel]
 entrypoint = "backend.main:app"
