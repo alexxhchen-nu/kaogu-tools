@@ -268,35 +268,39 @@ export default function LibraryPage({
                         <div className="book-meta">{book.description}</div>
                       </button>
 
-                      <div className="book-node" aria-hidden="true" />
+                      {isSelected ? (
+                        <>
+                          <div className="book-node" aria-hidden="true" />
 
-                      <div className="book-actions">
-                        <a
-                          className={`action-link${pdfUrl ? "" : " is-disabled"}`}
-                          href={pdfUrl ?? undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          原始 PDF
-                        </a>
-                        <div className="action-divider" />
-                        <a
-                          className={`action-link${markdownUrl ? "" : " is-disabled"}`}
-                          href={markdownUrl ?? undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Markdown
-                        </a>
-                        <a
-                          className={`action-link${csvUrl ? "" : " is-disabled"}`}
-                          href={csvUrl ?? undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          CSV
-                        </a>
-                      </div>
+                          <div className="book-actions" aria-label={`${book.title} 文件下载`}>
+                            <a
+                              className={`action-link${pdfUrl ? "" : " is-disabled"}`}
+                              href={pdfUrl ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              原始 PDF
+                            </a>
+                            <div className="action-divider" />
+                            <a
+                              className={`action-link${markdownUrl ? "" : " is-disabled"}`}
+                              href={markdownUrl ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Markdown
+                            </a>
+                            <a
+                              className={`action-link${csvUrl ? "" : " is-disabled"}`}
+                              href={csvUrl ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              CSV
+                            </a>
+                          </div>
+                        </>
+                      ) : null}
                     </article>
                   )
                 })
