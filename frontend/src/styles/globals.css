@@ -595,78 +595,127 @@
    Tool pages
    ============================================================ */
 .tool-page-shell {
-  height: 100svh;
-  overflow: hidden;
-  background: var(--paper);
+  min-height: 100svh;
+  background:
+    linear-gradient(90deg, rgba(35, 32, 26, 0.06) 1px, transparent 1px),
+    #eeeeec;
+  background-size: 72px 100%, auto;
 }
 
 .tool-page-main {
   display: grid;
-  height: 100svh;
-  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100svh;
+  grid-template-rows: auto auto;
+  gap: clamp(1.15rem, 2.4vh, 1.8rem);
+  padding: clamp(1.5rem, 4vh, 3rem) clamp(1rem, 4vw, 4rem) clamp(2rem, 5vh, 4rem);
 }
 
 .tool-hero {
-  background: var(--paper);
+  background: transparent;
 }
 
 .tool-hero-inner {
-  width: min(100%, var(--site-max-width));
+  width: min(100%, 82rem);
   margin: 0 auto;
-  padding: clamp(1.1rem, 2.4vh, 1.65rem) var(--site-gutter) clamp(0.9rem, 1.8vh, 1.25rem);
+  padding: 0;
 }
 
 .tool-crumbs {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
+  margin-bottom: 0.7rem;
   color: rgba(35, 32, 26, 0.6);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
   font-size: 0.75rem;
   font-weight: 800;
 }
 
 .tool-hero-box {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: clamp(1rem, 2vw, 1.6rem);
-  border-top: 1px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
-  padding: clamp(1rem, 2.2vh, 1.35rem) 0;
+  grid-template-columns: minmax(13rem, 28%) minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-height: clamp(11rem, 20vh, 14rem);
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  background: #f5f5f4;
+  box-shadow: 0 2px 0 rgba(35, 32, 26, 0.04);
 }
 
 .tool-hero-icon {
+  position: relative;
   display: grid;
-  width: clamp(4.25rem, 8vh, 5.5rem);
-  height: clamp(4.25rem, 8vh, 5.5rem);
-  flex-shrink: 0;
+  min-width: 0;
   place-items: center;
-  border: 1px solid var(--ink);
+  overflow: hidden;
+  border-right: 1px solid rgba(35, 32, 26, 0.12);
+  color: #fffdf8;
+  background:
+    linear-gradient(135deg, rgba(35, 32, 26, 0.16), transparent 46%),
+    var(--seal);
+}
+
+.tool-hero-icon::before,
+.tool-hero-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tool-hero-icon::before {
+  opacity: 0.6;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 1.05rem, rgba(255, 253, 248, 0.42) 1.05rem 1.32rem),
+    repeating-linear-gradient(0deg, transparent 0 2.1rem, rgba(255, 253, 248, 0.22) 2.1rem 2.36rem);
+  transform: rotate(-8deg) scale(1.25);
+}
+
+.tool-hero-icon::after {
+  background: radial-gradient(circle at 68% 52%, rgba(255, 253, 248, 0.2), transparent 0.18rem);
+  background-size: 3.2rem 3.2rem;
+}
+
+.tool-hero-icon svg {
+  position: relative;
+  z-index: 1;
+  width: clamp(3.1rem, 6vw, 4.3rem);
+  height: clamp(3.1rem, 6vw, 4.3rem);
+  padding: 0.9rem;
+  border-radius: 9999px;
+  background: rgba(35, 32, 26, 0.48);
+  box-shadow: 0 0 0 0.72rem rgba(255, 253, 248, 0.14);
+  box-sizing: content-box;
+}
+
+.tool-hero-box > div:not(.tool-hero-mark) {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: clamp(1.4rem, 3vw, 2.25rem) clamp(1.4rem, 3vw, 2.35rem);
 }
 
 .tool-hero-box h1 {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(2rem, 4vh, 3rem);
+  font-size: clamp(1.8rem, 3vw, 2.75rem);
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .tool-hero-kicker {
-  margin: 0.35rem 0 0;
-  color: rgba(35, 32, 26, 0.58);
-  font-size: 0.75rem;
-  font-weight: 900;
+  margin: 0.7rem 0 0;
+  color: rgba(35, 32, 26, 0.72);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
+  font-size: 0.95rem;
+  font-weight: 800;
   line-height: 1.2;
-  text-transform: uppercase;
 }
 
 .tool-hero-copy {
   max-width: 48rem;
   margin: 0.75rem 0 0;
-  color: rgba(35, 32, 26, 0.7);
-  font-size: 0.88rem;
+  color: rgba(35, 32, 26, 0.72);
+  font-size: clamp(0.98rem, 1.16vw, 1.08rem);
   line-height: 1.65;
 }
 
@@ -677,34 +726,34 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--ink);
-  border-radius: 9999px;
-  outline: 1px solid var(--ink);
-  outline-offset: 3px;
+  align-self: center;
+  margin-right: clamp(1rem, 2.5vw, 2rem);
+  border: 1px solid rgba(35, 32, 26, 0.24);
+  background: rgba(255, 253, 248, 0.34);
 }
 
 .tool-workbench-section {
-  width: min(100%, var(--site-max-width));
+  width: min(100%, 82rem);
   min-height: 0;
   margin: 0 auto;
-  padding: 0 var(--site-gutter) clamp(1.25rem, 3vh, 2rem);
+  padding: 0;
 }
 
 .tool-workbench {
   display: grid;
-  height: 100%;
   min-height: 0;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: clamp(1rem, 2vw, 1.5rem);
+  gap: clamp(1.15rem, 2vh, 1.6rem);
 }
 
 .tool-panel {
   display: flex;
-  min-height: 0;
+  min-height: clamp(28rem, 50vh, 38rem);
   flex-direction: column;
-  border: 1px solid var(--ink);
-  background: var(--paper);
-  padding: clamp(1rem, 2vh, 1.25rem);
+  border: 1px solid rgba(35, 32, 26, 0.16);
+  background: #f5f5f4;
+  padding: clamp(1.15rem, 2vw, 1.65rem);
+  box-shadow: 0 2px 0 rgba(35, 32, 26, 0.04);
   overflow: hidden;
 }
 
@@ -713,7 +762,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid rgba(35, 32, 26, 0.16);
   padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
 }
 
@@ -752,8 +801,8 @@
 
 .tool-endpoint {
   margin-top: clamp(0.75rem, 1.6vh, 1rem);
-  border: 1px solid var(--ink);
-  background: var(--paper);
+  border: 1px solid rgba(35, 32, 26, 0.18);
+  background: rgba(255, 253, 248, 0.42);
   padding: 0.75rem;
 }
 
@@ -765,15 +814,18 @@
   justify-content: center;
   gap: 0.5rem;
   margin-top: clamp(0.75rem, 1.6vh, 1rem);
-  background: var(--ink);
-  color: var(--paper);
+  border: 2px solid rgba(35, 32, 26, 0.7);
+  background: transparent;
+  color: var(--ink);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
   font-size: 0.875rem;
   font-weight: 900;
-  transition: background-color 160ms ease, opacity 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease;
 }
 
 .tool-run-button:hover {
-  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--seal);
 }
 
 .tool-run-button:disabled {
@@ -789,8 +841,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--ink);
-  background: var(--paper);
+  border: 1px dashed rgba(35, 32, 26, 0.34);
+  background: rgba(255, 253, 248, 0.38);
   padding: clamp(1rem, 3vh, 2rem);
   text-align: center;
   transition: border-color 160ms ease, color 160ms ease;
@@ -810,8 +862,8 @@
   min-height: 0;
   flex: 1;
   resize: none;
-  border: 1px solid var(--ink);
-  background: var(--paper);
+  border: 1px solid rgba(35, 32, 26, 0.18);
+  background: rgba(255, 253, 248, 0.42);
   padding: 0.75rem;
   color: var(--ink);
   font-size: 0.875rem;
@@ -826,28 +878,33 @@
 .tool-result-output {
   min-height: 100%;
   overflow: auto;
-  background: var(--ink);
+  border: 1px solid rgba(35, 32, 26, 0.18);
+  background: rgba(255, 253, 248, 0.42);
   padding: 1rem;
-  color: var(--paper);
+  color: var(--ink);
   font-size: 0.75rem;
   line-height: 1.6;
 }
 
 @media (max-width: 900px) {
   .tool-page-shell {
-    height: auto;
     min-height: 100svh;
-    overflow: visible;
   }
 
   .tool-page-main {
-    height: auto;
     min-height: 100svh;
+    padding-block: 2rem;
   }
 
   .tool-hero-box,
   .tool-workbench {
     grid-template-columns: 1fr;
+  }
+
+  .tool-hero-icon {
+    min-height: 10rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(35, 32, 26, 0.12);
   }
 
   .tool-hero-mark {
@@ -856,6 +913,10 @@
 
   .tool-workbench-section {
     min-height: 36rem;
+  }
+
+  .tool-panel {
+    min-height: 28rem;
   }
 }
 
@@ -1084,6 +1145,7 @@
 
 .toolbox-list-copy strong {
   color: currentColor;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
   font-size: clamp(1.35rem, 2vw, 1.7rem);
   font-weight: 900;
   line-height: 1.18;
@@ -1115,6 +1177,7 @@
   padding: 0 1.45rem;
   color: var(--ink);
   background: transparent;
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
   font-size: 0.96rem;
   font-weight: 900;
   line-height: 1;
@@ -1122,6 +1185,7 @@
 
 .toolbox-list-meta {
   color: rgba(35, 32, 26, 0.72);
+  font-family: "Noto Sans SC", "Zhuque Fangsong", serif;
   font-size: 0.95rem;
   font-weight: 800;
 }
